@@ -1,7 +1,7 @@
 name: TownyWars
-version: 1.1.4
-authors: [DanielRHarris]
-main: main.java.com.danielrharris.townywars.TownyWars
+version: 1.1.5
+authors: [DanielRHarris, geostar1024]
+main: net.minecraftcenter.townywars.TownyWars
 depend: [Towny]
 commands:
   twar:
