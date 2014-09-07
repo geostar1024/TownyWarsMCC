@@ -278,6 +278,7 @@ private TownyWars mplugin=null;
 	  DamageCause damageCause=event.getEntity().getLastDamageCause().getCause();
 	  
 	  String playerKiller=null;
+	  TownyWarsResident cre= mplugin.getTownyWarsResident(playerName);
 	  
 	  // here, the kill was not done by a player, so we need to look up who to credit, if anyone
 	  if (event.getEntity().getKiller()==null) {
@@ -285,12 +286,13 @@ private TownyWars mplugin=null;
 		  // let's look up who hit them last, and how long ago
 		  long lastHitTime=0;
 		  String lastAttacker=null;
-		  TownyWarsResident cre= mplugin.getTownyWarsResident(playerName);
+		  
 	
 			  if (cre!=null){
 				  lastHitTime=cre.getLastHitTime();
-				  lastAttacker=cre.getLastAttacker();
-				  // reset dead player's stats
+				  lastAttacker=cre.getLastAttacker(); 
+				  
+				// reset dead player's stats
 				  cre.setLastAttacker(null);
 				  cre.setLastHitTime(0);
 			  }
@@ -302,10 +304,19 @@ private TownyWars mplugin=null;
 				  // give the killer credit in chat :-)
 				  event.setDeathMessage(event.getDeathMessage()+" to escape "+playerKiller);
 			  }
+			  
 	  }
 	  // kill was done by another player
 	  else {
 		  playerKiller=event.getEntity().getKiller().getName();
+		  if (event.getEntity().getLastDamageCause().getCause()==DamageCause.FALL) {
+			  event.setDeathMessage(event.getDeathMessage()+" to escape "+playerKiller);
+		  }
+	  }
+	  if (cre!=null){
+		// reset dead player's stats
+		  cre.setLastAttacker(null);
+		  cre.setLastHitTime(0);
 	  }
 	  
 	  // we need to record the kill in all its glory to a log file for moderation use
