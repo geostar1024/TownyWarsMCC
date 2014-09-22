@@ -10,6 +10,8 @@ import com.palmergames.bukkit.towny.object.Town;
 public class TownyWarsTown{
 	
 	//private static long warTimeout=7*24*3600*1000;
+	
+	private String name=null;
 	private UUID uuid;
 	private Town town=null;
 	private double dp=0;
@@ -33,6 +35,7 @@ public class TownyWarsTown{
 		this.dp=this.maxdp;
 		this.deaths=deaths;
 		this.conquered=conquered;
+		this.name=this.town.getName();
 	}
 	
 	public UUID getUUID(){
@@ -43,17 +46,13 @@ public class TownyWarsTown{
 		return this.town;
 	}
 	
-	/*public boolean canBeWarred(TownyWarsNation nation) {
-		return this.getTimeLastFought(nation)-System.currentTimeMillis()>warTimeout;
+	public String getName() {
+		return this.name;
 	}
 	
-	public long getTimeLastFought(TownyWarsNation nation) {
-		return this.previousEnemies.get(nation);
+	public void setName(String name) {
+		this.name=name;
 	}
-	
-	public void addPreviousEnemy(TownyWarsNation nation, long time) {
-		this.previousEnemies.put(nation, time);
-	}*/
 	
 	public void setDP(double newDP){
 		this.dp=newDP;

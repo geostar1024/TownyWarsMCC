@@ -2,46 +2,30 @@ package net.minecraftcenter.townywars;
 
 import java.util.UUID;
 
-//import com.palmergames.bukkit.towny.event.DeleteNationEvent;
 import com.palmergames.bukkit.towny.event.NationAddTownEvent;
 import com.palmergames.bukkit.towny.event.NationRemoveTownEvent;
 import com.palmergames.bukkit.towny.event.NewNationEvent;
-//import com.palmergames.bukkit.towny.event.NationRemoveTownEvent;
+import com.palmergames.bukkit.towny.event.NewTownEvent;
+import com.palmergames.bukkit.towny.event.RenameNationEvent;
+import com.palmergames.bukkit.towny.event.RenameTownEvent;
 import com.palmergames.bukkit.towny.event.TownAddResidentEvent;
 import com.palmergames.bukkit.towny.event.TownRemoveResidentEvent;
-//import com.palmergames.bukkit.towny.exceptions.AlreadyRegisteredException;
 import com.palmergames.bukkit.towny.exceptions.EmptyTownException;
-//import com.palmergames.bukkit.towny.exceptions.AlreadyRegisteredException;
-//import com.palmergames.bukkit.towny.exceptions.EconomyException;
-//import com.palmergames.bukkit.towny.exceptions.EmptyNationException;
 import com.palmergames.bukkit.towny.exceptions.NotRegisteredException;
-import com.palmergames.bukkit.towny.object.Nation;
 import com.palmergames.bukkit.towny.object.Resident;
-import com.palmergames.bukkit.towny.object.Town;
 import com.palmergames.bukkit.towny.object.TownyUniverse;
-
-//import net.minecraftcenter.townywars.WarManager.WarStatus;
 
 import net.minecraftcenter.townywars.War.WarType;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-//import org.bukkit.Material;
 import org.bukkit.entity.Entity;
-//import org.bukkit.entity.Explosive;
-//import org.bukkit.entity.Explosive;
-//import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-//import org.bukkit.event.block.BlockBreakEvent;
-//import org.bukkit.event.block.BlockPlaceEvent;
-//import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
-//import org.bukkit.event.entity.EntityExplodeEvent;
-//import org.bukkit.event.entity.ExplosionPrimeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 
@@ -53,70 +37,18 @@ private TownyWars mplugin=null;
 	
   WarListener(TownyWars aThis) { mplugin=aThis;}
   
-  /*@EventHandler
-  public void onNationDelete(DeleteNationEvent event){
-	  
-	  TownyWarsNation nation;
-	try {
-		// convert the name of the nation (which is all we get from the DeleteNationEvent (getting the object would have been nice)
-		// to the corresponding TownyWarsNation object
-		nation = TownyWars.nationToTownyWarsNationHash.get(TownyUniverse.getDataSource().getNation(event.getNationName()));
-		
-	} catch (NotRegisteredException e) {
-		
-		// if the nation isn't registered for some reason, just stop this madness and return
-		// it probably shouldn't affect anything
-		e.printStackTrace();
-		return;
-	}
-	  
-	  for (War war : nation.getWars()){
-		  war.removeMember(nation);
-	  }
-  }*/
-  
   @EventHandler
-  public void onNationAdd(NewNationEvent event)
+  public void onNationCreation(NewNationEvent event)
   {
 	  TownyWars.nationToTownyWarsNationHash.put(event.getNation(), new TownyWarsNation(event.getNation()));
   }
   
-  /*  Nation nation = null;
-	  War war = null;
-	  
-	  for(War w : WarManager.getWars())
-		  for(Nation n : w.getNationsInWar())
-			  if(n.getName().equals(event.getNationName())){
-				  nation = n;
-				  war = w;
-				  break;
-			  }
-	  
-	  if(war == null){
-		  for(Rebellion r : Rebellion.getAllRebellions())
-		    	if(r.getMotherNation().getName().equals(event.getNationName()))
-		    		Rebellion.getAllRebellions().remove(r);
-		  return;
-	  }
-	  
-	  WarManager.getWars().remove(war);
-	  
-	  if(war.getRebellion() != null){
-		  Rebellion.getAllRebellions().remove(war.getRebellion());
-		  if(war.getRebellion().getRebelnation() != nation)
-			  TownyUniverse.getDataSource().deleteNation(war.getRebellion().getRebelnation());
-		  else if(war.getRebellion().getMotherNation() != nation)
-			  war.getRebellion().peace();
-	  }
-	  
-	  TownyUniverse.getDataSource().saveNations();
-	  try {
-			WarManager.save();
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-  }*/
+  @EventHandler
+  public void onTownCreation(NewTownEvent event)
+  {
+	  TownyWars.townToTownyWarsTownHash.put(event.getTown(), new TownyWarsTown(event.getTown()));
+  }
+  
   @EventHandler
   public void onPlayerJoin(PlayerJoinEvent event)
   {
@@ -152,12 +84,11 @@ private TownyWars mplugin=null;
 	    	  for (War war : nation.getWars()) {
 	    		  war.informPlayers(TownyWars.allTownyWarsResidents.get(player.getUniqueId()));
 	    		  if (nation.getNation().hasAssistant(resident) || resident.isKing()) {
-	    			  for (TownyWarsNation enemy : war.getEnemies(nation)) {
-	    				  if (war.getPeaceOffer(enemy)!=null) {
-	    					  player.sendMessage(ChatColor.GREEN+enemy.getNation().getName()+" has offered you peace:");
-	    					  player.sendMessage(war.getPeaceOffer(enemy));
-	    				  }
-	    			  }
+	    			  TownyWarsNation enemy=war.getEnemy(nation);
+    				  if (war.getPeaceOffer(enemy)!=null) {
+    					  player.sendMessage(ChatColor.GREEN+enemy.getNation().getName()+" has offered you peace:");
+    					  player.sendMessage(war.getPeaceOffer(enemy));
+    				  }
 	    		  }
 	    	  }
 	      }
@@ -167,29 +98,39 @@ private TownyWars mplugin=null;
   @EventHandler
   public void onResidentLeave(TownRemoveResidentEvent event)
   {
-    TownyWarsNation nation=null;
     try
     {
-      nation = TownyWars.nationToTownyWarsNationHash.get(event.getTown().getNation());
+    TownyWarsNation nation = TownyWars.nationToTownyWarsNationHash.get(event.getTown().getNation());
+      if (nation.isInWar()) {
+  	    TownyWarsTown town = TownyWars.townToTownyWarsTownHash.get(event.getTown());
+  	    town.calculateMaxDP();
+    	String message=ChatColor.RED+"Reminder: You cannot join another nation that is currently at war with the nation you've left!";
+    	for (Resident resident : town.getTown().getResidents()) {
+    		Player plr = Bukkit.getPlayer(resident.getName());
+		      if (plr != null) {  
+		        plr.sendMessage(message);
+		      }
+    	}
+    	// check to see if this town ceasing to exist would cause any in-progress wars to stop; if so, end them
+    	if (event.getTown().getResidents().size()==0) {
+    		for (War war : nation.getWars()) {
+    			if (war.getTargetTown().getTown()==event.getTown() && war.getWarType()==WarType.FLAG) {
+    				war.end();
+    			}
+    		}
+    	}
+      }
     }
     catch (NotRegisteredException ex)
     {
-      return;
+      // do nothing; evidently the town the resident left was not in a nation
     }
-    if (nation.isInWar()) {
-	    TownyWarsTown town = TownyWars.townToTownyWarsTownHash.get(event.getTown());
-	    double oldMaxDP=town.getMaxDP();
-	    double newMaxDP=town.calculateMaxDP();
-	    if (town.modifyDP(newMaxDP-oldMaxDP)<0) {
-	    	String message=ChatColor.RED+"Your town's DP is depleted and your town will be conquered upon the next resident's death!";
-	    	for (Resident resident : town.getTown().getResidents()) {
-	    		Player plr = Bukkit.getPlayer(resident.getName());
-			      if (plr != null) {  
-			        plr.sendMessage(message);
-			      }
-	    	}
-	    }
+    
+    // but we need to check to see if the town is about to be disbanded because everyone left it
+    if (event.getTown().getResidents().size()==0) {
+    	TownyWars.townToTownyWarsTownHash.remove(event.getTown());
     }
+    
   }
   
   @EventHandler
@@ -253,9 +194,8 @@ private TownyWars mplugin=null;
 		  TownyWarsNation nation = TownyWars.nationToTownyWarsNationHash.get(event.getNation());
 		  
 		  // this nation needs to get removed from any wars it was in
-		  // removeMember automatically cleans everything up
 		  for (War war : nation.getWars()) {
-			  war.removeMember(nation);
+			  war.end();
 		  }
 		  
 		  // remove the nation from the hashmap
@@ -265,38 +205,7 @@ private TownyWars mplugin=null;
 		  for (Resident resident : event.getNation().getResidents()) {
 			  TownyWars.residentToTownyWarsResidentHash.get(resident).setLastNation(null);
 		  }
-  }
-	 //MAKE FUCKING WORK when a town is disbanded because of lack of funds
-    /*if (event.getTown() != WarManager.townremove)
-    {
-      War war = WarManager.getWarForNation(event.getNation());
-      if (war == null) {
-        return;
-      }
-      townadd = event.getTown();
-      try
-      {
-    	  if(event.getNation().getNumTowns() != 0)
-    		  event.getNation().addTown(event.getTown());
-      }
-      catch (AlreadyRegisteredException ex)
-      {
-        Logger.getLogger(WarListener.class.getName()).log(Level.SEVERE, null, ex);
-      }
-    } else{
-    	 for(Rebellion r : Rebellion.getAllRebellions())
-    	    	if(r.isRebelLeader(event.getTown())){
-    	    		Rebellion.getAllRebellions().remove(r);
-    	    		break;
-    	    	}
-    	    	else if(r.isRebelTown(event.getTown())){
-    	    		r.removeRebell(event.getTown());
-    	    		break;
-    	    	}
-    }
-    
-    TownyUniverse.getDataSource().saveNations();
-    WarManager.townremove = null;*/
+	  }
   }
   
 @SuppressWarnings("deprecation")
@@ -321,13 +230,6 @@ private TownyWars mplugin=null;
 			  }
 		  }
 		  
-		  // see if the damaging entity was an explosive; if so just get the entry from the map
-		  // if it's null, it's no problem, really
-		 // else if (event.getDamager() instanceof Explosive) {
-			  //System.out.println(((Explosive)event.getDamager()).getLocation());
-		//	  attackerUUID=UUID.fromString("explosive");
-		 // }
-		  
 		  // if neither was true, then no need to update the player's stats
 		  if (attackerUUID==null) { return;}
 		  
@@ -342,41 +244,6 @@ private TownyWars mplugin=null;
 		  
 	  }
   }
-
-/*
-@EventHandler
-public void onRedstone(BlockRedstoneEvent event) {
-	System.out.println("redstone! on "+event.getBlock().getType());
-	if (event.getBlock().getType()==Material.OBSIDIAN) {
-		System.out.println("tnt about to explode.");
-	}
-	
-}
-
-@EventHandler
-public void onBlockPlace(BlockPlaceEvent event) {
-	if (event.getBlock().getType()==Material.TNT) {
-		mplugin.addTNTBlockPlacer(event.getBlock().getLocation(), event.getPlayer().getUniqueId());
-	}
-}
-
-@EventHandler
-public void onBlockRemove(BlockBreakEvent event) {
-	if (event.getBlock().getType()==Material.TNT) {
-		mplugin.removeTNTBlockPlacer(event.getBlock().getLocation());
-	}
-}
-
-@EventHandler
-public void onProjectileImpact(ProjectileImpactEvent event){
-	System.out.println(event.getProjectile().getProjectileID());
-}
-
-@EventHandler
-public void onCannonFire(CannonFireEvent event){
-	System.out.println(event.getCannon().getLoadedProjectile().getProjectileID());
-}*/
-  
   
   // here we want to differentiate between player deaths due solely to environmental damage
   // and due to environmental damage in combination with player hits
@@ -479,6 +346,7 @@ public void onCannonFire(CannonFireEvent event){
 	      War sharedWar=WarManager.getSharedWar(attackerNation, defenderNation);
     	  if (sharedWar!=null) {
 	    	  defenderTown.addDeath();
+	    	  defenderNation.addDeath();
 	    	  double currentDP = defenderTown.modifyDP(-1);
 	    	  
 	    	  // only allow town conquest in a normal war; conquest is not desirable in a rebellion or flag war, only DP damage
@@ -494,8 +362,7 @@ public void onCannonFire(CannonFireEvent event){
 	    			  event.getEntity().sendMessage(ChatColor.RED + "Danger! Your town's DP is negative! (" + currentDP + ")");
 	    		  }
 	    	  }
-	    	  TownyWarsNation winner=sharedWar.checkWin();
-	    	  if (winner!=null) {
+	    	  if (sharedWar.checkWinner()!=null) {
 	    		  sharedWar.end();
 	    	  }
 	      }
@@ -507,4 +374,16 @@ public void onCannonFire(CannonFireEvent event){
 		  return;
 	  }
 	}
+  
+  // update the TownyWarsNation object if the linked Nation object's name changes
+  @EventHandler
+  public void onNationNameChange(RenameNationEvent event) {
+	  TownyWars.nationToTownyWarsNationHash.get(event.getNation()).setName(event.getNation().getName());
+  }
+  
+//update the TownyWarsNation object if the linked Nation object's name changes
+ @EventHandler
+ public void onTownNameChange(RenameTownEvent event) {
+	  TownyWars.townToTownyWarsTownHash.get(event.getTown()).setName(event.getTown().getName());
+ }
 }

@@ -49,16 +49,8 @@ public class TownyWars extends JavaPlugin {
   public static Map<Resident,TownyWarsResident> residentToTownyWarsResidentHash = new HashMap<Resident,TownyWarsResident>();
   public static Map<Nation,TownyWarsNation> nationToTownyWarsNationHash = new HashMap<Nation,TownyWarsNation>();
   public static Map<Town,TownyWarsTown> townToTownyWarsTownHash = new HashMap<Town,TownyWarsTown>();
-  //public static Map<String,PreparedWar> allPreparedWars = new HashMap<String,PreparedWar>();
-  //public static Set<War> allWars = new HashSet<War>();
   
-  public Map<Location,UUID> allTNTBlocks = new HashMap<Location,UUID>();
-  
-  //set up the date conversion spec and the character set for file writing
-  private static final SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd zzz HH:mm:ss");
   private static final Charset utf8 = StandardCharsets.UTF_8;
-	
-  private static final String deathsFile="deaths.txt";
   
   private static final String nationsFile="nations.txt";
   
@@ -179,10 +171,6 @@ public class TownyWars extends JavaPlugin {
 	residentToTownyWarsResidentHash.put(resident, newPlayer);
   }
   
-  /*public TownyWarsResident getTownyWarsResident(UUID playerUUID){
-	  return allTownyWarsResidents.get(playerUUID);
-  }*/
-  
   public void setupTownyWarsHashMaps(){
 	  for (Nation nation : TownyUniverse.getDataSource().getNations()) {
 		  if (nationToTownyWarsNationHash.get(nation)==null){
@@ -197,22 +185,6 @@ public class TownyWars extends JavaPlugin {
 		  }
 	  }
   }
-  
-  /*
-  public void addTNTBlockPlacer(Location tntBlockLocation, UUID playerUUID) {
-	  System.out.println(tntBlockLocation);
-	  allTNTBlocks.put(tntBlockLocation,playerUUID);
-  }
-  
-  public UUID getTNTBlockPlacer(Location tntBlockLocation) {
-	  return allTNTBlocks.get(tntBlockLocation);
-  }
-  
-  public void removeTNTBlockPlacer(Location tntBlockLocation) {
-	  System.out.println(tntBlockLocation);
-	  allTNTBlocks.remove(tntBlockLocation);
-  }*/
-  
   
   
   public void loadTownyWarsNations(String savefile){

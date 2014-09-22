@@ -16,8 +16,10 @@ public class TownyWarsNation{
 	// by default, a nation can't be attacked by the same nation within 7 days of the last war ending
 	//private static long warTimeout=7*24*3600*1000;
 	
+	private String name=null;
 	private UUID uuid=null;
 	private Nation nation=null;
+	private int deaths=0;
 	private Set<War> wars=new HashSet<War>();
 	//private Map<TownyWarsNation,Long> previousEnemies = new HashMap<TownyWarsNation,Long>();
 	private List<TownyWarsTown> capitalPriority = new ArrayList<TownyWarsTown>();
@@ -25,15 +27,25 @@ public class TownyWarsNation{
 	public TownyWarsNation(Nation nation, UUID uuid){
 		this.uuid=uuid;
 		this.nation=nation;
+		this.name=this.nation.getName();
 	}
 	
 	public TownyWarsNation(Nation nation){
 		this.uuid=UUID.randomUUID();
 		this.nation=nation;
+		this.name=this.nation.getName();
 	}
 	
 	public Nation getNation(){
 		return this.nation;
+	}
+	
+	public String getName() {
+		return this.name;
+	}
+	
+	public void setName(String name) {
+		this.name=name;
 	}
 	
 	public double getDP(){
@@ -59,14 +71,15 @@ public class TownyWarsNation{
 	}
 	
 	public int getDeaths(){
-		int totalDeaths=0;
-		for (Town town : this.nation.getTowns()) {
-			TownyWarsTown townyWarsTown=TownyWars.townToTownyWarsTownHash.get(town);
-			if (townyWarsTown!=null){
-				totalDeaths+=townyWarsTown.getDeaths();
-			}
-		}
-		return totalDeaths;
+		return this.deaths;
+	}
+	
+	public void setDeaths(int deaths) {
+		this.deaths=deaths;
+	}
+	
+	public void addDeath() {
+		this.deaths++;
 	}
 	
 	public UUID getUUID() {
@@ -79,7 +92,7 @@ public class TownyWarsNation{
 	
 	public War getWarWithNation(TownyWarsNation nation) {
 		for (War war : this.wars) {
-			if (war.getEnemies(this).contains(nation)) {
+			if (war.getEnemy(this)==nation) {
 				return war;
 			}
 		}
