@@ -1,4 +1,4 @@
-package net.minecraftcenter.townywars;
+/*package net.minecraftcenter.townywars;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,9 +18,9 @@ import com.palmergames.bukkit.towny.object.Town;
 import com.palmergames.bukkit.towny.object.TownyUniverse;
 
 //Author: Noxer
-public class Rebellion {
+public class PreparedWar {
 
-	private static ArrayList<Rebellion> allRebellions = new ArrayList<Rebellion>();
+	//private static ArrayList<Rebellion> allRebellions = new ArrayList<Rebellion>();
 	private Nation motherNation;
 	private Nation rebelnation;
 	private String name;
@@ -332,4 +332,4 @@ public class Rebellion {
 		
 		return s;
 	}
-}
+}*/

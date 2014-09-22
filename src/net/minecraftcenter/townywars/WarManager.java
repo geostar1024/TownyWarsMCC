@@ -2,6 +2,7 @@ package net.minecraftcenter.townywars;
 
 import com.palmergames.bukkit.towny.exceptions.AlreadyRegisteredException;
 import com.palmergames.bukkit.towny.exceptions.EconomyException;
+import com.palmergames.bukkit.towny.exceptions.EmptyNationException;
 import com.palmergames.bukkit.towny.exceptions.NotRegisteredException;
 import com.palmergames.bukkit.towny.object.Nation;
 import com.palmergames.bukkit.towny.object.Resident;
@@ -11,14 +12,17 @@ import com.palmergames.util.FileMgmt;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import net.minecraftcenter.townywars.War.MutableInteger;
+//import net.minecraftcenter.townywars.War.MutableInteger;
+import net.minecraftcenter.townywars.War.WarType;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -28,14 +32,24 @@ import org.bukkit.entity.Player;
 public class WarManager
 {
 
+	/*public static enum WarStatus {
+		BEGIN,
+		END,
+		PEACE,
+		SURRENDER,
+		CONQUERED,
+		CONQUEROR,
+		CURRENT,
+	}*/
+	
   private static String fileSeparator = System.getProperty("file.separator");
   private static Set<War> activeWars = new HashSet<War>();
   private static Set<String> requestedPeace = new HashSet<String>();
-  public static Map<String, MutableInteger> neutral = new HashMap<String, MutableInteger>();
+  //public static Map<String, MutableInteger> neutral = new HashMap<String, MutableInteger>();
   public static Town townremove;
   //private static final int SAVING_VERSION = 1;
   
-  public static void save()
+ /* public static void save()
     throws Exception
   {
 	  FileMgmt.CheckYMLExists(new File("plugins" + fileSeparator + "TownyWars" + fileSeparator + "activeWars.yml"));
@@ -100,86 +114,257 @@ public class WarManager
 		    for(String s2 : slist)
 		    	WarManager.getWars().add(new War(s2));
 	    }
-  }
+  }*/
   
   public static Set<War> getWars()
   {
     return activeWars;
   }
   
-  public static War getWarForNation(Nation onation)
-  {
-    for (War w : activeWars) {
-      if (w.hasNation(onation)) {
-        return w;
-      }
-    }
-    return null;
+  public static void quickWar(TownyWarsNation declarer, List<TownyWarsNation> nations) {
+	  
+	  // make a default name using the declarer's name plus the current millisecond time
+	  // ugly? yes, but it's their fault for doing things "ze kveek way" . . . .
+	  String name=declarer.getNation().getName()+"-"+Long.toString(System.currentTimeMillis());
+	  
+	  War war = new War(name,declarer);
+	  
+	  // add all the nations that were specified
+	  for (TownyWarsNation nation : nations) {
+		  war.addMember(nation);
+	  }
+	  
+	  // set the type
+	  war.setWarType(WarType.NORMAL);
+	  
+	  // to war!
+	  war.execute();
   }
   
-  public static void createWar(Nation nat, Nation onat, CommandSender cs){
-	  createWar(nat, onat, cs, null);
+  public static void quickFlagWar(TownyWarsNation declarer, TownyWarsTown target, TownyWarsNation targetParent) {
+	  
+	  // make a default name using the declarer's name plus the current millisecond time
+	  // ugly? yes, but it's their fault for doing things "ze kveek way" . . . .
+	  String name=declarer.getNation().getName()+"-"+Long.toString(System.currentTimeMillis());
+	  
+	  War war = new War(name,declarer);
+	  war.addMember(targetParent);
+	  
+	  war.addTarget(target);
+	  
+	  war.setWarType(WarType.FLAG);
+	  
+	  war.execute();
   }
   
-public static void createWar(Nation nat, Nation onat, CommandSender cs, Rebellion r)
-  { 
-    if ((getWarForNation(nat) != null) || (getWarForNation(onat) != null))
-    {
-      cs.sendMessage(ChatColor.RED + "Your nation is already at war with another nation!");
-    }
-    else
-    {
-      try
-      {
-        try
-        {
-          TownyUniverse.getDataSource().getNation(nat.getName()).addEnemy(onat);
-          TownyUniverse.getDataSource().getNation(onat.getName()).addEnemy(nat);
-        }
-        catch (AlreadyRegisteredException ex)
-        {
-          Logger.getLogger(WarManager.class.getName()).log(Level.SEVERE, null, ex);
-        }
-      }
-      catch (NotRegisteredException ex)
-      {
-        Logger.getLogger(WarManager.class.getName()).log(Level.SEVERE, null, ex);
-      }
-      War war = new War(nat, onat, r);
-      activeWars.add(war);
-      for (Resident re : nat.getResidents())
-      {
-        Player plr = Bukkit.getPlayer(re.getName());
-        if (plr != null) {
-          plr.sendMessage(ChatColor.RED + "Your nation is now at war with " + onat.getName() + "!");
-        }
-      }
-      for (Resident re : onat.getResidents())
-      {
-        Player plr = Bukkit.getPlayer(re.getName());
-        if (plr != null) {
-          plr.sendMessage(ChatColor.RED + "Your nation is now at war with " + nat.getName() + "!");
-        }
-      }
-      for (Town t : nat.getTowns()) {
-        t.setPVP(true);
-      }
-      for (Town t : onat.getTowns()) {
-        t.setPVP(true);
-      }
-    }
-    
-    TownyUniverse.getDataSource().saveTowns();
-    TownyUniverse.getDataSource().saveNations();
-    try {
-		WarManager.save();
-	} catch (Exception e) {
-		// TODO Auto-generated catch block
+  public static boolean quickRebellion(String name, TownyWarsTown rebelTown, TownyWarsNation parent) {
+	  // make a default name for the war using the rebel town's name plus the current millisecond time
+	  // ugly? yes, but it's their fault for doing things "ze kveek way" . . . .
+	  String warName=rebelTown.getTown().getName()+"-"+Long.toString(System.currentTimeMillis());
+	  
+	  TownyWarsNation rebelNation=null;
+	  
+	  // try to make a new nation . . .
+	  try {
+		  TownyUniverse.getDataSource().newNation(name);
+		  rebelNation = TownyWars.nationToTownyWarsNationHash.get(TownyUniverse.getDataSource().getNation(name));
+	  }
+	  catch (Exception e) {
+		  System.out.println("[TownyWars] quick rebellion creation failed catastrophically!");
+		  e.printStackTrace();
+		  return false;
+	  }
+	  
+	  // . . .and move the town
+	  try {
+		  parent.getNation().removeTown(rebelTown.getTown());
+		  rebelNation.getNation().addTown(rebelTown.getTown());
+	  } catch (Exception e) {
+		  System.out.println("[TownyWars] quick rebellion town movement failed catastrophically!");
+		  e.printStackTrace();
+		  return false;
+	  }
+	  
+	  War war = new War(warName,rebelNation);
+	  
+	  // the only other member of the war is the parent nation, of course
+	  war.addMember(parent);
+	  
+	  // set the type
+	  war.setWarType(WarType.REBELLION);
+	  
+	  // to war!
+	  war.execute();
+	  return true;
+  }
+  
+  // a new war is born . . . send back a reference so it can be worked on more
+  public static War newWar(String name, TownyWarsNation declarer) {
+	  return new War(name,declarer);
+  }
+  
+  
+  /*public static void createWar(TownyWarsNation nations[], War.WarType type) {
+	  War war = new War(nations, type);
+	  activeWars.add(war);
+	  for (int k=0; k<nations.length; k++) {
+		  informPlayers(nations[k], war, WarStatus.BEGIN, null);
+	  }
+   
+	}
+  public static void createWar(TownyWarsNation nations[], War.WarType type, TownyWarsTown target) {
+	  if (type==WarType.REBELLION) {
+		  setupRebellion(nations[0],nations[1]);
+	  }
+	  War war = new War(nations, type, target);
+	  activeWars.add(war);
+	  for (int k=0; k<nations.length; k++) {
+		  informPlayers(nations[k], war, WarStatus.BEGIN, target);
+	  }
+  }
+  
+  public static boolean setupRebellion(TownyWarsTown rebel, TownyWarsNation parent) {
+	  if (!parent.getNation().hasTown(rebel.getTown())){
+		  return false;
+	  }
+	  else {
+		  TownyUniverse.getDataSource().newNation(name + "-rebels");
+	  }
+  }
+  
+  public static void informPlayers(TownyWarsNation nation, War war, WarStatus warStatus) {
+	  informPlayers(nation,null,war,warStatus);
+  }
+
+  public static void informPlayers(TownyWarsNation nation, TownyWarsResident resident, War war, WarStatus warStatus) {
+	// only need to construct the message once per nation
+	WarType warType=war.getWarType();
+	String message="";
+	if (nation.getNation().hasResident(TownyUniverse.getDataSource().getResident(resident.getPlayer().getName()))) {
+		message+=ChatColor.RED+"Your nation ";
+	}
+	else {
+		message+=ChatColor.BLUE+nation.getNation().getName()+" ";
+	}
+	switch(warStatus) {
+	case BEGIN:
+		message+="has entered";
+		break;
+	case CONQUERED:
+		message+="has been conquered in";
+		break;
+	case CONQUEROR:
+		message+="has won";
+		break;
+	case END:
+		message+="has ended";
+		break;
+	case PEACE:
+		message+="has made peace in";
+		break;
+	case SURRENDER:
+		message+="has surrendered in";
+		break;
+	case CURRENT:
+		message+="is in";
+		break;
+	default:
+		break;
+	}
+	message+=" a ";
+	switch(warType){
+	case FLAG:
+		message+="flag war";
+		break;
+	case NORMAL:
+		message+="war";
+		break;
+	case REBELLION:
+		message+="rebellion";
+		break;
+	default:
+		break;
+	}
+	message+=" against ";
+	Set<TownyWarsNation> enemies=war.getEnemies(nation);
+  	int numEnemies=enemies.size();
+  	int k=0;
+  	for (TownyWarsNation enemy : enemies) {
+  		message+=enemy.getNation().getName();
+  		
+  		// some fanciness: add a comma between names if there's 3 or more enemies
+  		// and add "and" after the last separating comma
+  		if (k<numEnemies-1 && numEnemies>2) {
+  			message+=", ";
+  			if (k<numEnemies-2) {
+  				message+="and ";
+  			}
+  		}
+  		k++;
+  	}
+  	if (warType==WarType.FLAG) {
+  		message+=", with target "+war.getTarget().getTown().getName();
+  	}
+  	message+="!";
+  	
+  	// display for all players in the nation if no player was explicitly specified
+  	if (resident==null) {
+		for (Resident resident1 : nation.getNation().getResidents()) {
+			Player plr = Bukkit.getPlayer(resident1.getName());
+		      if (plr != null) {  
+		        plr.sendMessage(message);
+		      }
+		}
+  	}
+  	else {
+  		resident.getPlayer().sendMessage(message);
+  	}
+}*/
+  
+  // handles the nitty gritty of conquest
+  // this will trigger the Towny event NationRemoveTownEvent
+  public static void moveTown(TownyWarsTown town, TownyWarsNation newNation) {
+	  TownyWarsNation oldNation=null;
+	try {
+		oldNation = TownyWars.nationToTownyWarsNationHash.get(town.getTown().getNation());
+	} catch (NotRegisteredException e) {
+		System.out.println("[TownyWars] moveTown: getting the town to move failed catastrophically!");
 		e.printStackTrace();
 	}
+	  
+	  // we'll need to know later if the town that's being moved was a capital
+	  boolean wasCapital=town.getTown().isCapital();
+	  try {
+		oldNation.getNation().removeTown(town.getTown());
+		newNation.getNation().addTown(town.getTown());
+	} catch (Exception e) {
+		System.out.println("[TownyWars] moveTown: moving the town failed catastrophically!");
+		e.printStackTrace();
+	}
+	  if (wasCapital) {
+		  // the old capital is no longer part of the town
+		  oldNation.removeCapitalPriorityForTown(town);
+		  
+		  // set the new capital to the first item in the capitalPriority list
+		  oldNation.getNation().setCapital(oldNation.getNextCapital().getTown());
+	  }
+	  
+	  // now increment the town's conquered state and reinitialize its DP
+	  town.addConquered();
   }
   
-public static boolean requestPeace(Nation nat, Nation onat, boolean admin)
+  // sets a generic peace request for the given nation in the given war
+  // if everyone wants peace, the war gets ended
+  public static void requestPeace(War war, TownyWarsNation nation) {
+	  war.setPeaceOffer(nation, "peace");
+	  if (war.allPeace()) {
+		  war.end();
+		  activeWars.remove(war);
+	  }
+  }
+  
+  
+/*public static boolean requestPeace(Nation nat, Nation onat, boolean admin)
   {
 	  
     if ((admin) || (requestedPeace.contains(onat.getName())))
@@ -215,9 +400,65 @@ public static boolean requestPeace(Nation nat, Nation onat, boolean admin)
       }
     }
     return false;
-  }
+  }*/
+
+	// try to end the war of the given name
+	// returns true if successful
+	public static boolean endWar(String warName) {
+		if (warName==null) {
+			return false;
+		}
+		for (War war : activeWars) {
+			if (war.getName()==warName) {
+				war.end();
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	// try to end the war of the given name
+		// returns true if successful
+	public static boolean endWar(War war, TownyWarsNation nation) {
+		war.endWarForNation(nation);
+		if (war.getNations().isEmpty()) {
+			activeWars.remove(war);
+		}
+		return true;
+	}
+	
+	public static War getSharedWar(TownyWarsNation nation1, TownyWarsNation nation2) {
+		for (War war : activeWars) {
+			if (war.isMember(nation1) && war.isMember(nation2)) {
+				return war;
+			}
+		}
+		return null;
+	}
+
+	/*&public static void endWar(War war, TownyWarsNation winner) {
+		// figure out what the outcome should be
+		switch(war.getWarType()) {
+		case FLAG:
+			break;
+		case NORMAL:
+			break;
+		case REBELLION:
+			break;
+		default:
+			break;
+		}
+		informPlayers(winner,war.getWarType(),WarStatus.CONQUEROR,null);
+		
+		
+		// end the war and remove it from the active war list
+		// TODO: should also record the outcome here!
+		//war.endWar(winner);
+		activeWars.remove(war);
+	}*/
   
-  public static void endWar(Nation winner, Nation looser, boolean peace)
+
+ /* public static void endWar(Nation winner, Nation looser, boolean peace)
   {
 	boolean isRebelWar = WarManager.getWarForNation(winner).getRebellion() != null;
 	Rebellion rebellion = WarManager.getWarForNation(winner).getRebellion();
@@ -300,7 +541,7 @@ public static boolean requestPeace(Nation nat, Nation onat, boolean admin)
 		// TODO Auto-generated catch block
 		e.printStackTrace();
 	}
-  }
+  }*/
   
   public static boolean hasBeenOffered(War ww, Nation nation)
   {
