@@ -484,6 +484,7 @@ public class War {
 		this.setWinner(this.checkWinner());
 		// indicate that the war has ended
 		this.status=WarStatus.ENDED;
+		this.endTime=System.currentTimeMillis();
 		
 		this.informPlayers(true);
 		for (TownyWarsNation nation : this.getNations()) {

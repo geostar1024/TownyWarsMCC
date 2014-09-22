@@ -1,41 +1,23 @@
 package net.minecraftcenter.townywars;
 
 import com.palmergames.bukkit.towny.Towny;
+import com.palmergames.bukkit.towny.exceptions.AlreadyRegisteredException;
 import com.palmergames.bukkit.towny.exceptions.NotRegisteredException;
 import com.palmergames.bukkit.towny.object.Nation;
 import com.palmergames.bukkit.towny.object.Resident;
 import com.palmergames.bukkit.towny.object.Town;
 import com.palmergames.bukkit.towny.object.TownyUniverse;
 
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-//import main.java.com.danielrharris.townywars.War.MutableInteger;
-
+import net.minecraftcenter.townywars.War.WarType;
 
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
-//import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-
-import java.sql.*;
 
 public class TownyWars extends JavaPlugin {
   public static TownyUniverse tUniverse;
@@ -49,40 +31,15 @@ public class TownyWars extends JavaPlugin {
   public static Map<Resident,TownyWarsResident> residentToTownyWarsResidentHash = new HashMap<Resident,TownyWarsResident>();
   public static Map<Nation,TownyWarsNation> nationToTownyWarsNationHash = new HashMap<Nation,TownyWarsNation>();
   public static Map<Town,TownyWarsTown> townToTownyWarsTownHash = new HashMap<Town,TownyWarsTown>();
-  
-  private static final Charset utf8 = StandardCharsets.UTF_8;
-  
-  private static final String nationsFile="nations.txt";
-  
-  private static final String warsFile="wars.txt";
 
   public void onDisable()
   {
-	  saveTownyWarsNations(nationsFile);
-    try
-    {
-      WarManager.save();
-    }
-    catch (Exception ex)
-    {
-      Logger.getLogger(TownyWars.class.getName()).log(Level.SEVERE, null, ex);
-    }
+	  
   }
   
   
   public void onEnable()
   {
-	  
-	loadTownyWarsNations(nationsFile);
-	loadWarsData(warsFile);
-    try
-    {
-      WarManager.load(getDataFolder());
-    }
-    catch (Exception ex)
-    {
-      Logger.getLogger(TownyWars.class.getName()).log(Level.SEVERE, null, ex);
-    }
     
     PluginManager pm = getServer().getPluginManager();
     pm.registerEvents(new WarListener(this), this);
@@ -96,31 +53,48 @@ public class TownyWars extends JavaPlugin {
     
     // load the current wars and set the PvP flag appropriately
     
-    for (String nationName : allWars.keySet()) {
-    	Nation nation=null;
-    	try {
-			nation=TownyUniverse.getDataSource().getNation(nationName);
-		} catch (NotRegisteredException e) {
-			// TODO Auto-generated catch block
-			System.out.println("[TownyWars] couldn't set PvP status for "+nationName+"! Specified nation doesn't seem to exist!");
-			e.printStackTrace();
+    for (War war : WarManager.getWars()) {
+    	// store the reference to this war in each of the TownyWarNation objects
+		for (TownyWarsNation nation : war.getNations()) {
+			nation.addWar(war);
 		}
-    	for (Town town : nation.getTowns()) {
-    		town.setPVP(true);
-    	}
+		
+		// make all nations in this war enemies!
+		for (TownyWarsNation nation1 : war.getNations()) {
+			for (TownyWarsNation nation2 : war.getNations()) {
+				if (nation1!=nation2) {
+					try {
+						// if the nations are already allies, don't set them to be enemies!
+						if (!nation1.getNation().hasAlly(nation2.getNation())) {
+							nation1.getNation().addEnemy(nation2.getNation());
+						}
+					} catch (AlreadyRegisteredException e) {
+						// ignore if a nation is already the enemy of another nation; could happen if two nations happen to be in multiple wars
+					}
+				}
+			}
+		}
+		
+		// turn on pvp for all the towns in all the nations at war!
+		if (war.getWarType()!=WarType.FLAG) {
+			for (TownyWarsNation nation : war.getNations()) {
+				for (Town town : nation.getNation().getTowns()) {
+					town.setPVP(true);
+				}
+			}
+		}
+		// but if it's a flag war, only turn on pvp for the aggressor and the target town(s)
+		else {
+			for (Town town : war.getDeclarer().getNation().getTowns()) {
+				town.setPVP(true);
+			}
+			war.getTargetTown().getTown().setPVP(true);
+		}
+
     }
     
     
-    /*for (War w : WarManager.getWars()) {
-      for (Nation nation : w.getNationsInWar()) {
-          for (Town t : nation.getTowns()) {
-            t.setPVP(true);
-          }
-      }
-    }*/
-    
-    
-    
+    TownyUniverse.getDataSource().saveNations();
     TownyUniverse.getDataSource().saveTowns();
     
     getConfig().addDefault("pper-player", Double.valueOf(2.0D));
@@ -185,116 +159,5 @@ public class TownyWars extends JavaPlugin {
 		  }
 	  }
   }
-  
-  
-  public void loadTownyWarsNations(String savefile){
-	  List<String> townyWarsData=null;
-	  try {
-		townyWarsData=Files.readAllLines(Paths.get(savefile), utf8);
-	} catch (IOException e) {
-		// TODO Auto-generated catch block
-		System.out.println("[TownyWars] file I/O error while loading nations!");
-		e.printStackTrace();
-	}
-	  if (townyWarsData!=null) {
-		  for (String townyWarsLine : townyWarsData) {
-			  if (townyWarsLine.contains("save time")) continue;
-			  String nationLine[]=townyWarsLine.split(" ");
-			  Nation currentNation=null;
-			  try {
-				  currentNation = TownyUniverse.getDataSource().getNation(nationLine[0]);
-				  } catch (NotRegisteredException e) {
-					// TODO Auto-generated catch block
-					System.out.println("[TownyWars] error loading nation "+nationLine[0]+"!");
-					e.printStackTrace();
-				}
-				if (currentNation!=null && nationToTownyWarsNationHash.get(currentNation)==null) {
-				  nationToTownyWarsNationHash.put(currentNation, new TownyWarsNation(currentNation));
-				}
-			  for (int k=1; k<nationLine.length;k+=2) {
-				  Town currentTown=null;
-				  try {
-						currentTown = TownyUniverse.getDataSource().getTown(nationLine[k]);
-					} catch (NotRegisteredException e) {
-						// TODO Auto-generated catch block
-						System.out.println("[TownyWars] error loading town "+nationLine[k]+"!");
-						e.printStackTrace();
-					}
-				  if (currentTown!=null) {
-					  if (townToTownyWarsTownHash.get(currentTown)==null) {
-						  townToTownyWarsTownHash.put(currentTown, new TownyWarsTown(currentTown));
-					  }
-					  townToTownyWarsTownHash.get(currentTown).setDP(Double.parseDouble(nationLine[k+1]));
-				  }
-			  }
-		  }
-	  }
-  }
-  
-public void saveTownyWarsNations(String savefile){
-	
-	List<String> townyWarsData=Arrays.asList("save time: "+Long.toString(System.currentTimeMillis()));
-	  for (Nation nation : nationToTownyWarsNationHash.keySet()) {
-		  String nationString=nation.getName();
-		  for (Town town : nation.getTowns()) {
-			  TownyWarsTown townyWarsTown=townToTownyWarsTownHash.get(town);
-			  if (townyWarsTown!=null) {
-				  nationString.concat(" "+town.getName()+" "+Double.toString(townyWarsTown.getDP()));
-			  }
-		  }
-		  townyWarsData.add(nationString);
-	  }
-	  try {
-		Files.write(Paths.get(savefile), townyWarsData, utf8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-	} catch (IOException e) {
-		// TODO Auto-generated catch block
-		System.out.println("[TownyWars] file I/O error while saving nations!");
-		e.printStackTrace();
-	}
-  }
-
-public void saveWarsData(String savefile){
-	
-	
-	List<String> warsData=Arrays.asList("save time: "+Long.toString(System.currentTimeMillis()));
-	
-	// each line has the following format (space separated):
-	// <war uuid> <war name>  <nation1 uuid> <nation2 uuid>, . . .
-	for (War war : allWars) {
-		String aWar=war.getUUID()+" "+war.getName();
-		for (String aCombatant : currentCombatants) {
-			combatantString.concat(" "+aCombatant);
-		}
-		warsData.add(combatantString);
-	}
-	try {
-		Files.write(Paths.get(savefile), warsData, utf8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-	} catch (IOException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-		System.out.println("[TownyWars] file I/O error while saving wars!");
-	}
-	
-}
-
-public void loadWarsData(String savefile){
-	 List<String> warsData=null;
-	  try {
-		warsData=Files.readAllLines(Paths.get(savefile), utf8);
-	} catch (IOException e) {
-		// TODO Auto-generated catch block
-		System.out.println("[TownyWars] file I/O error while loading wars!");
-		e.printStackTrace();
-	}
-	  if (warsData!=null) {
-	  	for (String warLine : warsData) {
-	  		String currentWar[]=warLine.split(" ");
-	  		if (allWars.get(currentWar[0])!=null) {
-	  			String combatants[]={currentWar[1],currentWar[2]};
-	  			allWars.put(currentWar[0], combatants);
-	  		}
-	  	}
-	  }
-}
   
 }
