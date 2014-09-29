@@ -1,9 +1,11 @@
 package net.minecraftcenter.townywars;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 //import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 //import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -12,6 +14,9 @@ import com.palmergames.bukkit.towny.object.Nation;
 import com.palmergames.bukkit.towny.object.Town;
 
 public class TownyWarsNation{
+	
+	private static Map<Nation,TownyWarsNation> nationToTownyWarsNationHash = new HashMap<Nation,TownyWarsNation>();
+	private static Map<UUID,TownyWarsNation> allTownyWarsNations = new HashMap<UUID,TownyWarsNation>();
 	
 	// by default, a nation can't be attacked by the same nation within 7 days of the last war ending
 	//private static long warTimeout=7*24*3600*1000;
@@ -24,14 +29,20 @@ public class TownyWarsNation{
 	//private Map<TownyWarsNation,Long> previousEnemies = new HashMap<TownyWarsNation,Long>();
 	private List<TownyWarsTown> capitalPriority = new ArrayList<TownyWarsTown>();
 	
+	public TownyWarsNation(Nation nation, UUID uuid, int deaths){
+		newTownyWarsNation(nation,uuid,deaths);
+	}
+	
 	public TownyWarsNation(Nation nation, UUID uuid){
-		this.uuid=uuid;
-		this.nation=nation;
-		this.name=this.nation.getName();
+		newTownyWarsNation(nation,uuid,0);
 	}
 	
 	public TownyWarsNation(Nation nation){
-		this.uuid=UUID.randomUUID();
+		newTownyWarsNation(nation,UUID.randomUUID(),0);
+	}
+	
+	private void newTownyWarsNation(Nation nation, UUID uuid, int deaths) {
+		this.uuid=uuid;
 		this.nation=nation;
 		this.name=this.nation.getName();
 	}
@@ -51,7 +62,7 @@ public class TownyWarsNation{
 	public double getDP(){
 		double totalDP=0;
 		for (Town town : this.nation.getTowns()) {
-			TownyWarsTown townyWarsTown=TownyWars.townToTownyWarsTownHash.get(town);
+			TownyWarsTown townyWarsTown=TownyWarsTown.getTown(town);
 			if (townyWarsTown!=null){
 				totalDP+=townyWarsTown.getDP();
 			}
@@ -62,7 +73,7 @@ public class TownyWarsNation{
 	public double getMaxDP(){
 		double maxDP=0;
 		for (Town town : this.nation.getTowns()) {
-			TownyWarsTown townyWarsTown=TownyWars.townToTownyWarsTownHash.get(town);
+			TownyWarsTown townyWarsTown=TownyWarsTown.getTown(town);
 			if (townyWarsTown!=null){
 				maxDP+=townyWarsTown.getMaxDP();
 			}
@@ -148,5 +159,66 @@ public class TownyWarsNation{
 	public TownyWarsTown getNextCapital() {
 		return this.capitalPriority.get(0);
 	}
+	
+	public static TownyWarsNation getNation(UUID uuid) {
+		return TownyWarsNation.allTownyWarsNations.get(uuid);
+	}
+	
+	public static TownyWarsNation getNation(Nation nation) {
+		return TownyWarsNation.nationToTownyWarsNationHash.get(nation);
+	}
+	
+	public static Set<TownyWarsNation> getAllNations() {
+		Set<TownyWarsNation> allNations=new HashSet<TownyWarsNation>();
+		for (UUID uuid : TownyWarsNation.allTownyWarsNations.keySet()) {
+			allNations.add(TownyWarsNation.allTownyWarsNations.get(uuid));
+		}
+		return allNations;
+	}
+	
+	public static boolean putNation(Nation nation) {
+		return putnation(nation,null);
+	}
+	
+	public static boolean putNation(Nation nation, TownyWarsNation newNation) {
+		return putnation(nation,newNation);
+	}
+	
+	private static boolean putnation(Nation nation, TownyWarsNation newNation) {
+		
+		// evidently the TownyWarsNation object wasn't specified, so a new one is needed
+		if (newNation==null) {
+			newNation=new TownyWarsNation(nation);
+		}
+		TownyWarsNation.allTownyWarsNations.put(newNation.getUUID(),newNation);
+		TownyWarsNation.nationToTownyWarsNationHash.put(nation, newNation);
+		return TownyWars.database.insertNation(newNation, true);
+	}
+	
+	public static boolean removeNation(UUID uuid) {
+		return removenation(uuid);
+	}
+	
+	public static boolean removeNation(Nation nation) {
+		return removenation(TownyWarsNation.getNation(nation).getUUID());
+	}
+	
+	public static boolean removeNation(TownyWarsNation nation) {
+		return removenation(nation.getUUID());
+	}
+	
+	private static boolean removenation(UUID uuid) {
+		TownyWarsNation nation = TownyWarsNation.getNation(uuid);
+		boolean saveSuccess=TownyWars.database.insertNation(nation, false);
+		TownyWarsNation.nationToTownyWarsNationHash.remove(nation.getNation());
+		TownyWarsNation.allTownyWarsNations.remove(uuid);
+		return saveSuccess;
+	}
+	
+	public static void printnations(){
+		  for (Map.Entry<UUID,TownyWarsNation> entry : TownyWarsNation.allTownyWarsNations.entrySet()) {
+			  System.out.println(entry.getValue());
+		  }
+	  }
 	
 }

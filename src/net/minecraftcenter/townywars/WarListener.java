@@ -2,12 +2,12 @@ package net.minecraftcenter.townywars;
 
 import java.util.UUID;
 
+import com.palmergames.bukkit.towny.event.DeleteNationEvent;
 import com.palmergames.bukkit.towny.event.NationAddTownEvent;
 import com.palmergames.bukkit.towny.event.NationRemoveTownEvent;
-import com.palmergames.bukkit.towny.event.NewNationEvent;
+//import com.palmergames.bukkit.towny.event.NewNationEvent;
 import com.palmergames.bukkit.towny.event.NewTownEvent;
 import com.palmergames.bukkit.towny.event.RenameNationEvent;
-import com.palmergames.bukkit.towny.event.RenameTownEvent;
 import com.palmergames.bukkit.towny.event.TownAddResidentEvent;
 import com.palmergames.bukkit.towny.event.TownRemoveResidentEvent;
 import com.palmergames.bukkit.towny.exceptions.EmptyTownException;
@@ -33,20 +33,30 @@ public class WarListener
   implements Listener
 {
   
-private TownyWars mplugin=null;
+//private TownyWars mplugin=null;
 	
-  WarListener(TownyWars aThis) { mplugin=aThis;}
+  WarListener(TownyWars aThis) { }//mplugin=aThis;}
   
   @EventHandler
+  public void onNationDelete(DeleteNationEvent event) {
+	  System.out.println("nation deleted!");
+	  System.out.println(event.getNationName());
+  }
+  
+  // TODO: currently never executes; awaiting fix from Towny developer
+  
+  /*@EventHandler
   public void onNationCreation(NewNationEvent event)
   {
-	  TownyWars.nationToTownyWarsNationHash.put(event.getNation(), new TownyWarsNation(event.getNation()));
-  }
+	  if (TownyWars.getTownyWarsNation(event.getNation())==null) {
+		  TownyWars.nationToTownyWarsNationHash.put(event.getNation(), new TownyWarsNation(event.getNation()));
+		  }
+  }*/
   
   @EventHandler
   public void onTownCreation(NewTownEvent event)
   {
-	  TownyWars.townToTownyWarsTownHash.put(event.getTown(), new TownyWarsTown(event.getTown()));
+	  TownyWarsTown.putTown(event.getTown());
   }
   
   @EventHandler
@@ -56,15 +66,19 @@ private TownyWars mplugin=null;
     
     // add the player to the master list if they don't exist in it yet
     // we use player UUIDs to prevent confusion and spoofing
-    if (TownyWars.allTownyWarsResidents.get(player.getUniqueId())==null){
-    	mplugin.addTownyWarsResident(player);
-    	System.out.println("new player added!");
+    if (TownyWarsResident.getResident(player.getUniqueId())==null){
+    	if (!TownyWarsResident.putResident(player)) {
+    		System.out.println("[TownyWars] error adding this player!");
+    	}
+    	else {
+    		System.out.println("new player added!");
+    	}
     }
       Resident resident=null;
       TownyWarsNation nation=null;
 	try {
 		resident = TownyUniverse.getDataSource().getResident(player.getName());
-		nation = TownyWars.nationToTownyWarsNationHash.get(resident.getTown().getNation());
+		nation = TownyWarsNation.getNation(resident.getTown().getNation());
 	} catch (NotRegisteredException e) {
 		
 		// the player is not registered for some reason or is not in a town or nation
@@ -75,14 +89,14 @@ private TownyWars mplugin=null;
       if (nation!=null) {
     	  
     	  // check that the player's stored lastNation is the same as the nation they're currently in and update if it's not
-    	  if (nation!=TownyWars.residentToTownyWarsResidentHash.get(resident).getLastNation()) {
-    		  TownyWars.residentToTownyWarsResidentHash.get(resident).setLastNation(nation);
+    	  if (nation!=TownyWarsResident.getResident(resident).getLastNation()) {
+    		  TownyWarsResident.getResident(resident).setLastNation(nation);
     	  }
     	  
 	      // inform the player about the wars currently going on
 	      if (!nation.getWars().isEmpty()) {
 	    	  for (War war : nation.getWars()) {
-	    		  war.informPlayers(TownyWars.allTownyWarsResidents.get(player.getUniqueId()));
+	    		  war.informPlayers(TownyWarsResident.getResident(player.getUniqueId()));
 	    		  if (nation.getNation().hasAssistant(resident) || resident.isKing()) {
 	    			  TownyWarsNation enemy=war.getEnemy(nation);
     				  if (war.getPeaceOffer(enemy)!=null) {
@@ -100,9 +114,9 @@ private TownyWars mplugin=null;
   {
     try
     {
-    TownyWarsNation nation = TownyWars.nationToTownyWarsNationHash.get(event.getTown().getNation());
+    TownyWarsNation nation = TownyWarsNation.getNation(event.getTown().getNation());
       if (nation.isInWar()) {
-  	    TownyWarsTown town = TownyWars.townToTownyWarsTownHash.get(event.getTown());
+  	    TownyWarsTown town = TownyWarsTown.getTown(event.getTown());
   	    town.calculateMaxDP();
     	String message=ChatColor.RED+"Reminder: You cannot join another nation that is currently at war with the nation you've left!";
     	for (Resident resident : town.getTown().getResidents()) {
@@ -128,7 +142,9 @@ private TownyWars mplugin=null;
     
     // but we need to check to see if the town is about to be disbanded because everyone left it
     if (event.getTown().getResidents().size()==0) {
-    	TownyWars.townToTownyWarsTownHash.remove(event.getTown());
+    	TownyWarsTown town=TownyWarsTown.getTown(event.getTown());
+    	TownyWars.database.insertTown(town, false);
+    	TownyWarsTown.removeTown(event.getTown());
     }
     
   }
@@ -138,10 +154,10 @@ private TownyWars mplugin=null;
   {
 	  // first we need to check if the town is in a nation that is in a war that the player has already been a part of
 	  // if so, remove the player from the town
-	  TownyWarsResident resident = TownyWars.residentToTownyWarsResidentHash.get(event.getResident());
+	  TownyWarsResident resident = TownyWarsResident.getResident(event.getResident());
 	  
 	  try {
-		  TownyWarsNation nation = TownyWars.nationToTownyWarsNationHash.get(event.getTown().getNation());
+		  TownyWarsNation nation = TownyWarsNation.getNation(event.getTown().getNation());
 		  
 		  // this could be null, so be careful; here we don't actually care about getting stuff out of this nation
 		  TownyWarsNation lastNation=resident.getLastNation();
@@ -160,16 +176,19 @@ private TownyWars mplugin=null;
 			  resident.setLastNation(nation);
 		  }
 	} catch (NotRegisteredException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
+		// not a problem, the town isn't in a nation
 	} catch (EmptyTownException e) {
 		// TODO Auto-generated catch block
 		e.printStackTrace();
 	}
 	  
 	  // in the case that the player joined a town not in a nation, don't update lastNation for the player
-	  
-	  TownyWarsTown town = TownyWars.townToTownyWarsTownHash.get(event.getTown());
+	  // be careful, because if this is a new town, it may not exist yet in the hashmap
+	  // if it doesn't, we'll put it in now
+	  if (TownyWarsTown.getTown(event.getTown())==null) {
+		  TownyWarsTown.putTown(event.getTown());
+	  }
+	  TownyWarsTown town = TownyWarsTown.getTown(event.getTown());
 	  double oldMaxDP = town.getMaxDP();
 	  double newMaxDP = town.calculateMaxDP();
 	  town.modifyDP(newMaxDP-oldMaxDP);
@@ -178,10 +197,10 @@ private TownyWars mplugin=null;
   @EventHandler
   public void onNationAdd(NationAddTownEvent event)
   {
-	  TownyWarsTown town = TownyWars.townToTownyWarsTownHash.get(event.getTown());
+	  TownyWarsTown town = TownyWarsTown.getTown(event.getTown());
 	  
 	  // derate the town's starting DP based on the number of times it's been conquered so far in the wars it's been in
-	  town.setDP(town.calculateMaxDP()/(town.getConquered()+1));
+	  town.resetDP();
   }
   
   
@@ -191,19 +210,20 @@ private TownyWars mplugin=null;
 	  // we need to see if this was the last town removed, in which case, the nation ceases to exist
 	  // we have to handle the nation removal here, because the Nation object is already gone when the NationDeletedEvent triggers!
 	  if (event.getNation().getTowns().isEmpty()){
-		  TownyWarsNation nation = TownyWars.nationToTownyWarsNationHash.get(event.getNation());
+		  
+		  TownyWarsNation nation = TownyWarsNation.getNation(event.getNation());
 		  
 		  // this nation needs to get removed from any wars it was in
 		  for (War war : nation.getWars()) {
 			  war.end();
 		  }
 		  
-		  // remove the nation from the hashmap
-		  TownyWars.nationToTownyWarsNationHash.remove(event.getNation());
+		  // save and remove the nation
+		  TownyWarsNation.removeNation(nation);
 		  
 		  // update all the lastNation field for all players of this shortly-nonexistent nation
 		  for (Resident resident : event.getNation().getResidents()) {
-			  TownyWars.residentToTownyWarsResidentHash.get(resident).setLastNation(null);
+			  TownyWarsResident.getResident(resident).setLastNation(null);
 		  }
 	  }
   }
@@ -235,7 +255,7 @@ private TownyWars mplugin=null;
 		  
 		  //String playerName=((Player)event.getEntity()).getName();
 		  UUID playerUUID=((Player)event.getEntity()).getUniqueId();
-		  TownyWarsResident player=TownyWars.allTownyWarsResidents.get(playerUUID);
+		  TownyWarsResident player=TownyWarsResident.getResident(playerUUID);
 		  if (player!=null) {
 			  // update the player's stats
 			  player.setLastHitTime(hitTime);
@@ -254,16 +274,16 @@ private TownyWars mplugin=null;
 	  // record the timestamp immediately
 	  long deathTime = System.currentTimeMillis();
 	  
-	  // get the name of the dead resident
-	  String playerName = event.getEntity().getName();
+	  // get the dead resident
+	  Player player = event.getEntity();
 	  
 	  // get the name of the cause of death
-	  DamageCause damageCause=event.getEntity().getLastDamageCause().getCause();
+	  DamageCause damageCause=player.getLastDamageCause().getCause();
 	  
-	  String playerKiller=null;
-	  TownyWarsResident currentResident = TownyWars.allTownyWarsResidents.get(event.getEntity().getUniqueId());
+	  Player playerKiller=null;
+	  TownyWarsResident currentResident = TownyWarsResident.getResident(player.getUniqueId());
 	  
-	  System.out.println(event.getEntity().getWorld().getName());
+	  System.out.println(player.getWorld().getName());
 	  
 	  // here, the kill was not done by a player, so we need to look up who to credit, if anyone
 	  UUID lastAttackerUUID=null;
@@ -283,18 +303,18 @@ private TownyWars mplugin=null;
 			  
 			  // if the player has been hit by another player within the past 30 seconds, credit the killer
 			  if (lastAttackerUUID!=null && deathTime-lastHitTime<30000){
-				  playerKiller=Bukkit.getServer().getPlayer(lastAttackerUUID).getName();
+				  playerKiller=Bukkit.getServer().getPlayer(lastAttackerUUID);
 				  // give the killer credit in chat :-)
-				  event.setDeathMessage(event.getDeathMessage()+" while trying to escape "+playerKiller);
+				  event.setDeathMessage(event.getDeathMessage()+" while trying to escape "+playerKiller.getName());
 			  }
 			  // the player was not hit by another player within the past 30 seconds
 			  // so let's see if the player's last attacker is still somewhere nearby (a chase might be afoot)
 			  else {
 				  for (Entity entity : event.getEntity().getNearbyEntities(10D, 10D, 10D)) {
 					  if (entity.getUniqueId()==lastAttackerUUID) {
-						  playerKiller=Bukkit.getServer().getPlayer(lastAttackerUUID).getName();
+						  playerKiller=Bukkit.getServer().getPlayer(lastAttackerUUID);
 						  // give the killer credit in chat :-)
-						  event.setDeathMessage(event.getDeathMessage()+" while trying to escape "+playerKiller);
+						  event.setDeathMessage(event.getDeathMessage()+" while trying to escape "+playerKiller.getName());
 					  }
 
 				  }
@@ -308,9 +328,9 @@ private TownyWars mplugin=null;
 	  }
 	  // kill was done by another player
 	  else {
-		  playerKiller=event.getEntity().getKiller().getName();
+		  playerKiller=player.getKiller();
 		  if (event.getEntity().getLastDamageCause().getCause()==DamageCause.FALL) {
-			  event.setDeathMessage(event.getDeathMessage()+" while trying to escape "+playerKiller);
+			  event.setDeathMessage(event.getDeathMessage()+" while trying to escape "+playerKiller.getName());
 		  }
 	  }
 	  if (currentResident!=null){
@@ -321,14 +341,12 @@ private TownyWars mplugin=null;
 	  
 	  // we need to record the kill in all its glory to a log file for moderation use
 	  // takes in the time of death in milliseconds, the player that was killed, the killer, the final cause of death, and the death message
-	  int status = KillRecord.writeKillRecord(deathTime,event.getEntity().getName(),playerKiller,damageCause.name(),event.getDeathMessage());
-	  
-	  if (status==0){
-	  		System.out.println("death recorded!");
-	  	}
-	  	else {
-	  			System.out.println("[ERROR] death recording failed! you should check on this!");
-	  		}
+	  if (!TownyWars.database.insertKill(deathTime, player, playerKiller, damageCause.name(), event.getDeathMessage())) {
+		  System.out.println("[TownyWars] death recording failed! you should check on this!");
+	  }
+	  else {
+		  System.out.println("[TownyWars] death recorded!");
+	  }
 	  
 	  // if the player actually wasn't killed by another player, we can stop
 	  if (playerKiller==null) { return; }
@@ -337,11 +355,11 @@ private TownyWars mplugin=null;
 	  // now we know who to credit, so let's adjust Towny to match
 	  
 	  try {
-	      TownyWarsTown attackerTown = TownyWars.townToTownyWarsTownHash.get(TownyUniverse.getDataSource().getResident(playerKiller).getTown());
-	      TownyWarsNation attackerNation = TownyWars.nationToTownyWarsNationHash.get(attackerTown.getTown().getNation());
+	      TownyWarsTown attackerTown = TownyWarsTown.getTown(TownyUniverse.getDataSource().getResident(playerKiller.getName()).getTown());
+	      TownyWarsNation attackerNation = TownyWarsNation.getNation(attackerTown.getTown().getNation());
 
-	      TownyWarsTown defenderTown = TownyWars.townToTownyWarsTownHash.get(TownyUniverse.getDataSource().getResident(playerName).getTown());
-	      TownyWarsNation defenderNation = TownyWars.nationToTownyWarsNationHash.get(defenderTown.getTown().getNation());
+	      TownyWarsTown defenderTown = TownyWarsTown.getTown(TownyUniverse.getDataSource().getResident(player.getName()).getTown());
+	      TownyWarsNation defenderNation = TownyWarsNation.getNation(defenderTown.getTown().getNation());
 	      
 	      War sharedWar=WarManager.getSharedWar(attackerNation, defenderNation);
     	  if (sharedWar!=null) {
@@ -378,12 +396,7 @@ private TownyWars mplugin=null;
   // update the TownyWarsNation object if the linked Nation object's name changes
   @EventHandler
   public void onNationNameChange(RenameNationEvent event) {
-	  TownyWars.nationToTownyWarsNationHash.get(event.getNation()).setName(event.getNation().getName());
+	  TownyWarsNation.getNation(event.getNation()).setName(event.getNation().getName());
   }
   
-//update the TownyWarsNation object if the linked Nation object's name changes
- @EventHandler
- public void onTownNameChange(RenameTownEvent event) {
-	  TownyWars.townToTownyWarsTownHash.get(event.getTown()).setName(event.getTown().getName());
- }
 }

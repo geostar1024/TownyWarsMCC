@@ -25,12 +25,16 @@ public class WarManager
     return activeWars;
   }
   
-  public static void quickWar(TownyWarsNation declarer, TownyWarsNation target) {
+  public static boolean quickWar(TownyWarsNation declarer, TownyWarsNation target) {
+	  
+	  if (getSharedWar(declarer,target)!=null) {
+		  return false;
+	  }
 	  
 	  // make a default name using the declarer's name plus the last 6 digits of the current millisecond time
 	  // ugly? yes, but it's their fault for doing things "ze kveek way" . . . .
 	  String random=Long.toString(System.currentTimeMillis());
-	  String name=declarer.getNation().getName()+"-"+random.substring(random.length()-6,6);
+	  String name=declarer.getNation().getName()+"-"+random.substring(random.length()-4,random.length());
 	  
 	  War war = new War(name,declarer);
 	  
@@ -41,37 +45,58 @@ public class WarManager
 	  war.setWarType(WarType.NORMAL);
 	  
 	  // to war!
-	  war.execute();
+	  return war.execute();
   }
   
-  public static void quickFlagWar(TownyWarsNation declarer, TownyWarsTown target, TownyWarsNation targetParent) {
+  public static boolean quickFlagWar(TownyWarsNation declarer, TownyWarsTown target, TownyWarsNation targetParent) {
+	  
+	  if (getSharedWar(declarer,targetParent)!=null) {
+		  return false;
+	  }
 	  
 	  // make a default name using the declarer's name plus the last 6 digits of the current millisecond time
 	  // ugly? yes, but it's their fault for doing things "ze kveek way" . . . .
 	  String random=Long.toString(System.currentTimeMillis());
-	  String name=declarer.getNation().getName()+"-"+random.substring(random.length()-6,6);
+	  String name=declarer.getNation().getName()+"-"+random.substring(random.length()-4,random.length());
 	  
 	  War war = new War(name,declarer);
+	  activeWars.add(war);
+	  
 	  war.setTarget(targetParent);
 	  
 	  war.setTargetTown(target);
 	  
 	  war.setWarType(WarType.FLAG);
 	  
-	  war.execute();
+	  return war.execute();
   }
   
   public static boolean quickRebellion(String name, TownyWarsTown rebelTown, TownyWarsNation parent) {
+	  
+	  // first make sure the parent nation isn't itself in a rebellion
+	  // it is *not* rebellions all the way down . . .
+	  for (War war: parent.getWars()) {
+		  if (war.getWarType()==WarType.REBELLION) {
+			  return false;
+		  }
+	  }
+	  
+	  // also check that there is more than one town in the parent nation
+	  if (parent.getNation().getTowns().size()<2) {
+		  return false;
+	  }
+	  
 	  // make a default name for the war using the rebel town's name plus the current millisecond time
 	  // ugly? yes, but it's their fault for doing things "ze kveek way" . . . .
-	  String warName=rebelTown.getTown().getName()+"-"+Long.toString(System.currentTimeMillis());
+	  String random=Long.toString(System.currentTimeMillis());
+	  String warName=rebelTown.getName()+"-"+random.substring(random.length()-4,random.length());
 	  
 	  TownyWarsNation rebelNation=null;
 	  
 	  // try to make a new nation . . .
 	  try {
 		  TownyUniverse.getDataSource().newNation(name);
-		  rebelNation = TownyWars.nationToTownyWarsNationHash.get(TownyUniverse.getDataSource().getNation(name));
+		  rebelNation = TownyWarsNation.getNation(TownyUniverse.getDataSource().getNation(name));
 	  }
 	  catch (Exception e) {
 		  System.out.println("[TownyWars] quick rebellion creation failed catastrophically!");
@@ -98,8 +123,7 @@ public class WarManager
 	  war.setWarType(WarType.REBELLION);
 	  
 	  // to war!
-	  war.execute();
-	  return true;
+	  return war.execute();
   }
   
   // handles the nitty gritty of conquest
@@ -107,7 +131,7 @@ public class WarManager
   public static void moveTown(TownyWarsTown town, TownyWarsNation newNation) {
 	  TownyWarsNation oldNation=null;
 	try {
-		oldNation = TownyWars.nationToTownyWarsNationHash.get(town.getTown().getNation());
+		oldNation = TownyWarsNation.getNation(town.getTown().getNation());
 	} catch (NotRegisteredException e) {
 		System.out.println("[TownyWars] moveTown: getting the town to move failed catastrophically!");
 		e.printStackTrace();
@@ -160,7 +184,7 @@ public class WarManager
 			return false;
 		}
 		for (War war : activeWars) {
-			if (war.getName()==warName && war.getWarStatus()!=WarStatus.ENDED) {
+			if (war.getName().compareTo(warName)==0 && war.getWarStatus()!=WarStatus.ENDED) {
 				war.end();
 				return true;
 			}
@@ -172,6 +196,15 @@ public class WarManager
 	public static War getSharedWar(TownyWarsNation nation1, TownyWarsNation nation2) {
 		for (War war : nation1.getWars()) {
 			if (war.hasMember(nation2)) {
+				return war;
+			}
+		}
+		return null;
+	}
+	
+	public static War getWar(String warName) {
+		for (War war : activeWars) {
+			if (war.getName().compareTo(warName)==0) {
 				return war;
 			}
 		}

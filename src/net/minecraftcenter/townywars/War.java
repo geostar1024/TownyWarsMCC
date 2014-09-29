@@ -6,8 +6,10 @@ import com.palmergames.bukkit.towny.object.Resident;
 import com.palmergames.bukkit.towny.object.Town;
 import com.palmergames.bukkit.towny.object.TownyUniverse;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -36,6 +38,7 @@ public class War {
 	private UUID uuid=null;
 	private long startTime=0;
 	private long endTime=0;
+	private long prewarTime=0;
 	private WarType type=null;
 	private WarStatus status=null;
 	private TownyWarsTown targetTown=null;
@@ -45,12 +48,12 @@ public class War {
 	private String targetTownName=null;
 	private String targetName=null;
 	private String declarerName=null;
-	private long prewarTime=0;
 	
-	private Map<TownyWarsNation,String> peaceOffers = new HashMap<TownyWarsNation,String>();
-	//private Map<TownyWarsNation,Double> requestedMoney = new HashMap<TownyWarsNation,Double>();
-	private Map<TownyWarsNation,Integer> deaths = new HashMap<TownyWarsNation,Integer>();
-	private Set<TownyWarsNation> peaceAccepted = new HashSet<TownyWarsNation>();
+	
+	private Map<UUID,String> peaceOffers = new HashMap<UUID,String>();
+	private Map<UUID,Double> requestedMoney = new HashMap<UUID,Double>();
+	private Map<UUID,Integer> deaths = new HashMap<UUID,Integer>();
+	private Set<UUID> peaceAccepted = new HashSet<UUID>();
 	
 	public War(String name, TownyWarsNation declarer, UUID uuid) {
 		newWar(name,declarer,uuid);
@@ -77,7 +80,7 @@ public class War {
 		// the creator of the war is by default the declarer
 		this.declarer=declarer;
 		
-		this.deaths.put(declarer, 0);
+		this.deaths.put(declarer.getUUID(), 0);
 	}
 	
 	
@@ -86,6 +89,7 @@ public class War {
 		
 		// make sure the war is sufficiently set up
 		if (!checkWar()) {
+			System.out.println("war not setup correctly!");
 			return false;
 		}
 		
@@ -140,7 +144,7 @@ public class War {
 	
 	// determine if enough war parameters are set
 	boolean checkWar() {
-		if (this.type==null || (this.target==null && this.type==WarType.FLAG) || this.deaths.keySet().size()<2) {
+		if (this.type==null || (this.target==null && this.type==WarType.FLAG) || this.getNations().size()<2) {
 			return false;
 		}
 		return true;
@@ -158,8 +162,15 @@ public class War {
 		return this.declarer;
 	}
 	
-	public Set<TownyWarsNation> getNations(){
-		return this.deaths.keySet();
+	public void setStartTime(long time) {
+		this.startTime=time;
+	}
+	
+	public List<TownyWarsNation> getNations(){
+		List<TownyWarsNation> allNations=new ArrayList<TownyWarsNation>();
+		allNations.add(this.declarer);
+		allNations.add(this.target);
+		return allNations;
 	}
 	
 	public WarType getWarType() {
@@ -168,6 +179,14 @@ public class War {
 	
 	public WarStatus getWarStatus() {
 		return this.status;
+	}
+	
+	public void setWarStatus(WarStatus status) {
+		this.status=status;
+	}
+	
+	public static double getThreshold() {
+		return threshold;
 	}
 	
 	public boolean setWarType(WarType type) {
@@ -234,7 +253,12 @@ public class War {
 	}
 	
 	public void setTarget(TownyWarsNation nation) {
+		if (this.target!=null) {
+			this.deaths.remove(this.target.getUUID());
+		}
 		this.target=nation;
+		this.deaths.put(this.target.getUUID(), 0);
+		
 	}
 	
 	public TownyWarsTown getTargetTown() {
@@ -247,7 +271,7 @@ public class War {
 		
 		// attempt to add this town's parent nation to the war
 		try {
-			nation=TownyWars.nationToTownyWarsNationHash.get(town.getTown().getNation());	
+			nation=TownyWarsNation.getNation(town.getTown().getNation());	
 		} catch (NotRegisteredException e) {
 			
 			// the town needs to be in a nation, or it is not a valid target at this point
@@ -274,32 +298,32 @@ public class War {
 	}
 	
 	public void setDeaths(TownyWarsNation nation, int deaths) {
-		this.deaths.put(nation,deaths);
+		this.deaths.put(nation.getUUID(),deaths);
 	}
 	
 	public String getPeaceOffer(TownyWarsNation nation) {
-		return this.peaceOffers.get(nation);
+		return this.peaceOffers.get(nation.getUUID());
 	}
 	
 	public boolean offeredPeace(TownyWarsNation nation) {
-		return (this.peaceOffers.get(nation)!=null);
+		return (this.peaceOffers.get(nation.getUUID())!=null);
 	}
 	
 	public boolean acceptedPeace(TownyWarsNation nation) {
-		return this.peaceAccepted.contains(nation);
+		return this.peaceAccepted.contains(nation.getUUID());
 	}
 	
 	public void acceptPeace(TownyWarsNation nation) {
-		this.peaceAccepted.add(nation);
+		this.peaceAccepted.add(nation.getUUID());
 	}
 	
 	public void setPeaceOffer(TownyWarsNation nation, String peaceOffer) {
-		this.peaceOffers.put(nation, peaceOffer);
+		this.peaceOffers.put(nation.getUUID(), peaceOffer);
 	}
 	
 	public boolean allPeaceOffered(){
 		for (TownyWarsNation nation : this.getNations()) {
-			if (this.peaceOffers.get(nation)==null) {
+			if (this.peaceOffers.get(nation.getUUID())==null) {
 				return false;
 			}
 		}
@@ -308,11 +332,19 @@ public class War {
 	
 	public boolean allPeaceAccepted() {
 		for (TownyWarsNation nation : this.getNations()) {
-			if (!this.peaceAccepted.contains(nation)) {
+			if (!this.peaceAccepted.contains(nation.getUUID())) {
 				return false;
 			}
 		}
 		return true;
+	}
+	
+	public double getRequestedMoney(TownyWarsNation nation) {
+		return this.requestedMoney.get(nation.getUUID());
+	}
+	
+	public void setRequestedMoney(TownyWarsNation nation, double money) {
+		this.requestedMoney.put(nation.getUUID(),money);
 	}
 	
 	public TownyWarsNation checkWinner(){
@@ -407,76 +439,94 @@ public class War {
 		if (this.status==WarStatus.PREPARE && resident==null) {
 			return;
 		}
-		String message=this.name+": ";
-		if (!all) {
-			for (TownyWarsNation nation : this.getNations()) {
-				if (nation==this.declarer) {
-					message=ChatColor.GOLD+"Your nation";
-				}
-				else {
-					message=ChatColor.GOLD+nation.getNation().getName();
-				}
-				
-				switch(this.status) {
-				case CURRENT:
-					message+="is in";
-					break;
-				case ENDED:
-					if (nation==this.winner) {
-						message+="won";
-					}
-					else if (this.winner==null) {
-						message+="made peace in";
-					}
-					else {
-						message+="lost";
-					}
-					break;
-				case PREWAR:
-					message+="is threatening";
-					break;
-				case PREPARE:
-					message+="is preparing";
-					break;
-				default:
-					break;
-				}
-				message+=" a ";
-				switch(this.type){
-				case FLAG:
-					message+="flag war";
-					break;
-				case NORMAL:
-					message+="war";
-					break;
-				case REBELLION:
-					message+="rebellion";
-					break;
-				default:
-					break;
-				}
-				
-				// now handle the enemy
-				message+=" against "+this.getEnemy(nation);
-				
-			  	// display for all players in the nation if no player was explicitly specified
-			  	if (resident==null) {
-					for (Resident resident1 : nation.getNation().getResidents()) {
-						Player plr = Bukkit.getPlayer(resident1.getName());
-					      if (plr != null) {  
-					        plr.sendMessage(message);
-					      }
-					}
-			  	}
-			  	else {
-			  		resident.getPlayer().sendMessage(message);
-			  	}
-			}
+		String message=ChatColor.GOLD+"War "+ChatColor.WHITE+this.name+": "+ChatColor.GOLD;
+		if (all) {
+			message+=this.declarer.getName()+informPlayersSelector(this.declarer);
+			Bukkit.getServer().broadcastMessage(message);
+			return;
 		}
 		
-		if (all) {
-			Bukkit.getServer().broadcastMessage(message);
+		if (resident!=null) {
+			TownyWarsNation nation=null;
+			try {
+				nation=TownyWarsNation.getNation(resident.getResident().getTown().getNation());
+			} catch (NotRegisteredException e) {
+				// just continue, it isn't fatal if this resident isn't in a nation
+			}
+			if (nation==this.declarer) {
+				message+="Your nation";
+			}
+			else {
+				message+=this.declarer.getName();
+			}
+			message+=informPlayersSelector(this.declarer);
+			resident.getPlayer().sendMessage(message);
+			return;
 		}
+		for (TownyWarsNation nation : this.getNations()) {
+			if (nation==this.declarer) {
+				message+="Your nation";
+			}
+			else {
+				message+=nation.getNation().getName();
+			}
+			message+=informPlayersSelector(this.declarer);
+
+		  	// display for all players in the nation
+			for (Resident resident1 : nation.getNation().getResidents()) {
+				Player plr = Bukkit.getPlayer(resident1.getName());
+			      if (plr != null) {  
+			        plr.sendMessage(message);
+			      }
+			}
+		 }
+
+	}
+	
+	private String informPlayersSelector(TownyWarsNation nation) {
+		String message=" ";
+		switch(this.status) {
+		case CURRENT:
+			message+="is in";
+			break;
+		case ENDED:
+			if (nation==this.winner) {
+				message+="won";
+			}
+			else if (this.winner==null) {
+				message+="made peace in";
+			}
+			else {
+				message+="lost";
+			}
+			break;
+		case PREWAR:
+			message+="is threatening";
+			break;
+		case PREPARE:
+			message+="is preparing";
+			break;
+		default:
+			break;
+		}
+		message+=" a ";
+		switch(this.type){
+		case FLAG:
+			message+="flag war";
+			break;
+		case NORMAL:
+			message+="war";
+			break;
+		case REBELLION:
+			message+="rebellion";
+			break;
+		default:
+			break;
+		}
+		
+		// now handle the enemy
+		message+=" against "+this.getEnemy(nation).getName();
+		return message;
 	}
 	
 	// immediately end the war for everyone involved
@@ -504,7 +554,7 @@ public class War {
 			if (nation.getWars().isEmpty()) {
 				for (Town town : nation.getNation().getTowns()) {
 					town.setPVP(false);
-					TownyWars.townToTownyWarsTownHash.get(town).setConquered(0);
+					TownyWarsTown.getTown(town).setConquered(0);
 				}
 			}
 		}
@@ -517,7 +567,7 @@ public class War {
 		
 		// finally, handle the special case of a rebellion ending not in the rebels' favor
 		if (this.type==WarType.REBELLION && this.winner!=this.declarer) {
-			TownyWarsTown loser=TownyWars.townToTownyWarsTownHash.get(this.declarer.getNation().getCapital());
+			TownyWarsTown loser=TownyWarsTown.getTown(this.declarer.getNation().getCapital());
 			try {
 				this.declarer.getNation().removeTown(loser.getTown());
 				this.winner.getNation().addTown(loser.getTown());
@@ -526,7 +576,8 @@ public class War {
 				e.printStackTrace();
 			}
 			TownyUniverse.getDataSource().removeNation(this.declarer.getNation());
-			TownyWars.nationToTownyWarsNationHash.remove(this.declarer);
+			
+			TownyWarsNation.removeNation(this.declarer);
 		}
 
 		// save the stuff we've been doing

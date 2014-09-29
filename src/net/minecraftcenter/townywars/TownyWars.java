@@ -2,15 +2,9 @@ package net.minecraftcenter.townywars;
 
 import com.palmergames.bukkit.towny.Towny;
 import com.palmergames.bukkit.towny.exceptions.AlreadyRegisteredException;
-import com.palmergames.bukkit.towny.exceptions.NotRegisteredException;
 import com.palmergames.bukkit.towny.object.Nation;
-import com.palmergames.bukkit.towny.object.Resident;
 import com.palmergames.bukkit.towny.object.Town;
 import com.palmergames.bukkit.towny.object.TownyUniverse;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 import net.minecraftcenter.townywars.War.WarType;
 
@@ -27,14 +21,18 @@ public class TownyWars extends JavaPlugin {
   public static double declareCost;
   public static double endCost;
   
-  public static Map<UUID,TownyWarsResident> allTownyWarsResidents = new HashMap<UUID,TownyWarsResident>();
-  public static Map<Resident,TownyWarsResident> residentToTownyWarsResidentHash = new HashMap<Resident,TownyWarsResident>();
-  public static Map<Nation,TownyWarsNation> nationToTownyWarsNationHash = new HashMap<Nation,TownyWarsNation>();
-  public static Map<Town,TownyWarsTown> townToTownyWarsTownHash = new HashMap<Town,TownyWarsTown>();
+  
+  private final static String databasefile="townywars.db";
+  
+  public static TownyWarsDatabase database=null;
 
   public void onDisable()
   {
 	  
+	  if (!database.saveAll()) {
+		  System.out.println("[ERROR] could not save TownyWars state!!");
+	  }
+	  database.close();
   }
   
   
@@ -50,6 +48,14 @@ public class TownyWars extends JavaPlugin {
     	town.setAdminDisabledPVP(false);
     	town.setPVP(false);
     }
+    
+    // get a database object based on the specified database file
+    database=new TownyWarsDatabase(databasefile);
+    
+    // create necessary database tables if they don't already exist
+    database.createTables();
+    
+    setupTownyWarsHashMaps();
     
     // load the current wars and set the PvP flag appropriately
     
@@ -116,9 +122,9 @@ public class TownyWars extends JavaPlugin {
     // usually only needed on reloads
     try{
     	for (Player player : Bukkit.getServer().getWorlds().get(0).getPlayers()) {
-    		if (allTownyWarsResidents.get(player.getUniqueId())==null){
-    			addTownyWarsResident(player);
-    		}
+   			if (!TownyWarsResident.putResident(player)) {
+   				System.out.println("[TownyWars] error loading player '"+player.getName()+"'!");
+   			}
     	}
     	System.out.println(tUniverse.getActiveResidents().size()+" residents added!");
     }catch (Exception ex)
@@ -128,36 +134,22 @@ public class TownyWars extends JavaPlugin {
       }
     
   }
-  
-  public void addTownyWarsResident(Player player){
-	  Resident resident=null;
-	try {
-		resident=TownyUniverse.getDataSource().getResident(player.getName());
-		
-	} catch (NotRegisteredException e) {
-		// this is really bad; this should never happen
-		System.out.println("[TownyWars] player not registered!");
-		e.printStackTrace();
-		return;
-	}
-	TownyWarsResident newPlayer = new TownyWarsResident(player,resident);
-	allTownyWarsResidents.put(player.getUniqueId(),newPlayer);
-	residentToTownyWarsResidentHash.put(resident, newPlayer);
-  }
+ 
   
   public void setupTownyWarsHashMaps(){
 	  for (Nation nation : TownyUniverse.getDataSource().getNations()) {
-		  if (nationToTownyWarsNationHash.get(nation)==null){
-			  TownyWarsNation townyWarsNation=new TownyWarsNation(nation);
-			  nationToTownyWarsNationHash.put(nation, townyWarsNation);
-		  }
-		  for (Town town : nation.getTowns()) {
-			  if (townToTownyWarsTownHash.get(town)==null){
-				  TownyWarsTown townyWarsTown=new TownyWarsTown(town);
-				  townToTownyWarsTownHash.put(town, townyWarsTown);
-			  }
+		  System.out.println(nation);
+		  if (TownyWarsNation.getNation(nation)==null){
+			  TownyWarsNation.putNation(nation, new TownyWarsNation(nation));
 		  }
 	  }
+	  TownyWarsNation.printnations();
+	  for (Town town : TownyUniverse.getDataSource().getTowns()) {
+		  if (TownyWarsTown.getTown(town)==null){
+			  TownyWarsTown.putTown(town, new TownyWarsTown(town));
+		  }
+	  }
+	  TownyWarsTown.printtowns();
   }
   
 }
