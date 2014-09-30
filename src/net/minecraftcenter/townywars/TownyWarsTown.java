@@ -18,6 +18,7 @@ public class TownyWarsTown{
 	private static Map<Town,TownyWarsTown> townToTownyWarsTownHash = new HashMap<Town,TownyWarsTown>();
 	private static Map<UUID,TownyWarsTown> allTownyWarsTowns = new HashMap<UUID,TownyWarsTown>();
 	
+	private String name;
 	private UUID uuid;
 	private Town town=null;
 	private double dp=0;
@@ -38,6 +39,7 @@ public class TownyWarsTown{
 	private void newTownyWarsTown(Town town, UUID uuid, int deaths, Double dp, int conquered, Double mindpfactor) {
 		this.uuid=uuid;
 		this.town=town;
+		this.name=town.getName();
 		this.conquered=conquered;
 		this.maxdp=calculateMaxDP();
 		if (dp==null) {
@@ -47,7 +49,6 @@ public class TownyWarsTown{
 			this.dp=dp;
 		}
 		this.deaths=deaths;
-		//this.name=this.town.getName();
 		if (mindpfactor==null) {
 			this.mindpfactor=.1;
 		}
@@ -62,7 +63,11 @@ public class TownyWarsTown{
 	}
 	
 	public String getName() {
-		return this.getTown().getName();
+		return this.name;
+	}
+	
+	public void setName(String name) {
+		this.name=name;
 	}
 	
 	public void setDP(double newDP){
@@ -124,6 +129,18 @@ public class TownyWarsTown{
 	
 	public int getConquered(){
 		return this.conquered;
+	}
+	
+	// this is substantially slower than the other getTown methods since it has to loop over all existing towns
+	public static TownyWarsTown getTown(String townName) {
+		for (Map.Entry<UUID,TownyWarsTown> entry : TownyWarsTown.allTownyWarsTowns.entrySet()) {
+			if (entry.getValue().getName().compareTo(townName)==0) {
+				return entry.getValue();
+			}
+		}
+		
+		// we didn't find an object with this name
+		return null;
 	}
 	
 	public static TownyWarsTown getTown(UUID uuid) {

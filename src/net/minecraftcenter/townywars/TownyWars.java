@@ -122,7 +122,7 @@ public class TownyWars extends JavaPlugin {
     // usually only needed on reloads
     try{
     	for (Player player : Bukkit.getServer().getWorlds().get(0).getPlayers()) {
-   			if (!TownyWarsResident.putResident(player)) {
+   			if (TownyWarsResident.putResident(player)==null) {
    				System.out.println("[TownyWars] error loading player '"+player.getName()+"'!");
    			}
     	}

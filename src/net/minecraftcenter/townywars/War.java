@@ -581,8 +581,7 @@ public class War {
 		}
 
 		// save the stuff we've been doing
-		TownyUniverse.getDataSource().saveTowns();
-	    TownyUniverse.getDataSource().saveNations();
+		TownyUniverse.getDataSource().saveAll();
 	}
 
 }

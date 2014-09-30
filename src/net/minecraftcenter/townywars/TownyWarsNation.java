@@ -160,6 +160,18 @@ public class TownyWarsNation{
 		return this.capitalPriority.get(0);
 	}
 	
+	// this is substantially slower than the other getTown methods since it has to loop over all existing towns
+	public static TownyWarsNation getNation(String nationName) {
+		for (Map.Entry<UUID,TownyWarsNation> entry : TownyWarsNation.allTownyWarsNations.entrySet()) {
+			if (entry.getValue().getName().compareTo(nationName)==0) {
+				return entry.getValue();
+			}
+		}
+		
+		// we didn't find an object with this name
+		return null;
+	}
+	
 	public static TownyWarsNation getNation(UUID uuid) {
 		return TownyWarsNation.allTownyWarsNations.get(uuid);
 	}

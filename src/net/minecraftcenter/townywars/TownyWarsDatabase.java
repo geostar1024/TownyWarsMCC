@@ -209,23 +209,25 @@ public class TownyWarsDatabase {
 	
 	public boolean insertResident(TownyWarsResident resident) {
 		String warString="";
-		String lastNationUUID="' '";
+		String lastNationUUID="";
 		if (resident.getLastNation()!=null) {
-			lastNationUUID="'"+resident.getLastNation().getUUID().toString()+"'";
+			lastNationUUID=resident.getLastNation().getUUID().toString();
 		}
-		String lastAttackerUUID="' '";
+		String lastAttackerUUID="";
 		if (resident.getLastAttackerUUID()!=null) {
-			lastAttackerUUID="'"+resident.getLastAttackerUUID().toString()+"'";
+			lastAttackerUUID=resident.getLastAttackerUUID().toString();
 		}
 		for (War war : resident.getActiveWars()) {
 			warString+=","+war.getUUID().toString();
 		}
 		if (warString.isEmpty()) {
-			warString="' '";
+			warString="''";
 		}
-		String sql=townyWarsResidentInsert+" VALUES ('"+resident.getUUID().toString()+"','"+resident.getPlayer().getName()+"',"+lastNationUUID+","
-				+Long.toString(resident.getLastHitTime())+","+lastAttackerUUID+","+Long.toString(resident.getLastLoginTime())+","
+		
+		String sql=townyWarsResidentInsert+" VALUES ('"+resident.getUUID().toString()+"','"+resident.getPlayer().getName()+"','"+lastNationUUID+"',"
+				+Long.toString(resident.getLastHitTime())+",'"+lastAttackerUUID+"',"+Long.toString(resident.getLastLoginTime())+","
 				+Long.toString(resident.getLastLogoutTime())+","+Long.toString(resident.getTotalPlayTime())+","+warString+");";
+		System.out.print(sql);
 		return this.executeSQL(sql);
 	}
 	
@@ -249,12 +251,12 @@ public class TownyWarsDatabase {
 			moneyString+=","+Double.toString(war.getRequestedMoney(nation));
 		}
 		if (offerString.isEmpty()) {
-			offerString="' '";
+			offerString="''";
 		}
 		
 		String sql=townyWarsWarInsert+" VALUES ('"+war.getUUID().toString()+"','"+war.getName()+"',"+Long.toString(war.getStartTime())+","
-				+Long.toString(war.getEndTime())+","+Long.toString(war.getPrewarTime())+","+war.getWarType()+","+war.getWarStatus()+","
-				+war.getDeclarer().getUUID().toString()+","+war.getTarget().getUUID().toString()+","+war.getTargetTown().getUUID().toString()+","+war.getWinner().getUUID().toString()+","
+				+Long.toString(war.getEndTime())+","+Long.toString(war.getPrewarTime())+","+war.getWarType()+","+war.getWarStatus()+",'"
+				+war.getDeclarer().getUUID().toString()+"','"+war.getTarget().getUUID().toString()+"','"+war.getTargetTown().getUUID().toString()+"','"+war.getWinner().getUUID().toString()+"',"
 				+Double.toString(War.getThreshold())+","+nationString+","+deathString+","+offerString+","+acceptedString+","+moneyString+");";
 		return this.executeSQL(sql);
 	}
@@ -311,7 +313,7 @@ public class TownyWarsDatabase {
 	}
 	
 	public boolean loadAllWars() {
-		String sql="select * from townywarswars where state is not 3;";
+		String sql="select * from townywarswars where state is not ENDED;";
 		ResultSet result=this.executeQuery(sql);
 		if (result==null) {
 			return false;
@@ -424,25 +426,32 @@ public class TownyWarsDatabase {
 	}
 	
 	public boolean loadResident(Player player) {
-		String sql="select * from townywarsresidents where uuid is "+player.getUniqueId().toString()+";";
+		String sql="select * from townywarsresidents where uuid is '"+player.getUniqueId().toString()+"';";
 		ResultSet result=this.executeQuery(sql);
 		if (result==null) {
 			return false;
 		}
 		try {
-			UUID uuid=UUID.fromString(result.getString("uuid"));
-			UUID nationUUID=UUID.fromString(result.getString("nation"));
+			String nationString=result.getString("nation");
+			UUID nationUUID=null;
+			if (!nationString.isEmpty()) {
+				nationUUID=UUID.fromString(nationString);
+			}
 			long hitTime=result.getLong("hit");
-			UUID attackerUUID=UUID.fromString(result.getString("attacker"));
+			String attackerString=result.getString("attacker");
+			UUID attackerUUID=null;
+			if (!attackerString.isEmpty()) {
+				attackerUUID=UUID.fromString(attackerString);
+			}
 			long loginTime=result.getLong("login");
 			long logoutTime=result.getLong("logout");
 			long playTime=result.getLong("playtime");
 			String warString=result.getString("wars");
-			if (!TownyWarsResident.putResident(player)) {
+			TownyWarsResident resident=TownyWarsResident.putResident(player,false);
+			if (resident==null) {
 				System.out.println("[TownyWars] error loading player from database!");
 			}
-			TownyWarsResident resident=TownyWarsResident.getResident(uuid);
-			
+		
 			// doesn't matter if it comes back null
 			TownyWarsNation nation = TownyWarsNation.getNation(nationUUID);
 			

@@ -111,6 +111,10 @@ public class TownyWarsResident{
 		this.totalPlayTime=totalTime;
 	}
 	
+	public void updateTotalPlayTime() {
+		this.totalPlayTime+=this.lastLogoutTime-this.lastLoginTime;
+	}
+	
 	public void removeOldWar(War war) {
 		this.activeWars.remove(war);
 	}
@@ -154,7 +158,15 @@ public class TownyWarsResident{
 		return TownyWarsResident.residentToTownyWarsResidentHash.get(resident);
 	}
 	
-	public static boolean putResident(Player player) {
+	public static TownyWarsResident putResident(Player player, boolean checkDatabase) {
+		return putresident(player,checkDatabase);
+	}
+	
+	public static TownyWarsResident putResident(Player player) {
+		return putresident(player,true);
+	}
+	
+	public static TownyWarsResident putresident(Player player, boolean checkDatabase) {
 		Resident resident=null;
 		try {
 			resident = TownyUniverse.getDataSource().getResident(player.getName());
@@ -162,7 +174,7 @@ public class TownyWarsResident{
 			// this is really bad; this should never happen
 			System.out.println("[TownyWars] player not registered!");
 			e.printStackTrace();
-			return false;
+			return null;
 		}
 		// resident should not be null from this point
 		
@@ -172,7 +184,11 @@ public class TownyWarsResident{
 		if (newResident==null) {
 			
 			// we still need to check the database, because the player may not be loaded yet
-			if (!TownyWars.database.loadResident(player)) {
+			boolean result=false;
+			if (checkDatabase) {
+				result=TownyWars.database.loadResident(player);
+			}
+			if (!result) {
 				
 				// evidently the player wasn't found the database either, so we need a completely new object
 				newResident = new TownyWarsResident(player,resident);
@@ -194,7 +210,7 @@ public class TownyWarsResident{
 		if (!TownyWars.database.insertResident(newResident)) {
 			System.out.println("[TownyWars] database error during new resident insertion!");
 		}
-		return true;
+		return newResident;
 	}
 	
 }
