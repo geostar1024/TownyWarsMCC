@@ -6,7 +6,11 @@ import com.palmergames.bukkit.towny.object.Nation;
 import com.palmergames.bukkit.towny.object.Town;
 import com.palmergames.bukkit.towny.object.TownyUniverse;
 
-import net.minecraftcenter.townywars.War.WarType;
+import net.minecraftcenter.townywars.object.TownyWarsNation;
+import net.minecraftcenter.townywars.object.TownyWarsResident;
+import net.minecraftcenter.townywars.object.TownyWarsTown;
+import net.minecraftcenter.townywars.object.War;
+import net.minecraftcenter.townywars.object.War.WarType;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -40,7 +44,8 @@ public class TownyWars extends JavaPlugin {
   {
     
     PluginManager pm = getServer().getPluginManager();
-    pm.registerEvents(new WarListener(this), this);
+    pm.registerEvents(new TownyWarsListener(), this);
+    pm.registerEvents(new TownyWarsPlayerListener(), this);
     getCommand("twar").setExecutor(new WarExecutor(this));
     tUniverse = ((Towny)Bukkit.getPluginManager().getPlugin("Towny")).getTownyUniverse();
     for(Town town : TownyUniverse.getDataSource().getTowns()){

@@ -1,10 +1,13 @@
-package net.minecraftcenter.townywars;
+package net.minecraftcenter.townywars.object;
 
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+import net.minecraftcenter.townywars.TownyWars;
+
 import org.bukkit.entity.Player;
 
 import com.palmergames.bukkit.towny.exceptions.NotRegisteredException;
@@ -12,7 +15,7 @@ import com.palmergames.bukkit.towny.object.Resident;
 import com.palmergames.bukkit.towny.object.TownyUniverse;
 
 // some extra resident fields needed to properly record deaths
-public class TownyWarsResident{
+public class TownyWarsResident extends TownyWarsObject {
 	
 	private static Map<UUID,TownyWarsResident> allTownyWarsResidents = new HashMap<UUID,TownyWarsResident>();
 	private static Map<Resident,TownyWarsResident> residentToTownyWarsResidentHash = new HashMap<Resident,TownyWarsResident>();
@@ -28,19 +31,23 @@ public class TownyWarsResident{
 	private TownyWarsNation lastNation=null;
 	
 	public TownyWarsResident(Player player, Resident resident){
+		super(player.getUniqueId());
 		newTownyWarsResident(player,resident,null,0,null,0,0,0);
 	}
 	
 	public TownyWarsResident(Player player, Resident resident, TownyWarsNation nation){
+		super(player.getUniqueId());
 		newTownyWarsResident(player,resident,nation,0,null,0,0,0);
 	}
 	
 	public TownyWarsResident(Player player, Resident resident, TownyWarsNation nation, long lastHitTime, UUID lastAttackerUUID, long lastLoginTime, long lastLogoutTime, long totalPlayTime){
+		super(player.getUniqueId());
 		newTownyWarsResident(player,resident,nation,lastHitTime,lastAttackerUUID,lastLoginTime,lastLogoutTime,totalPlayTime);
 	}
 
 	
 	private void newTownyWarsResident(Player player, Resident resident, TownyWarsNation nation, long lastHitTime, UUID lastAttackerUUID, long lastLoginTime, long lastLogoutTime, long totalPlayTime){
+		this.setName(player.getName());
 		this.player=player;
 		this.resident=resident;
 		this.lastNation=nation;
@@ -49,10 +56,6 @@ public class TownyWarsResident{
 		this.lastLoginTime=lastLoginTime;
 		this.lastLogoutTime=lastLogoutTime;
 		this.totalPlayTime=totalPlayTime;
-	}
-	
-	public UUID getUUID(){
-		return this.player.getUniqueId();
 	}
 	
 	public Resident getResident() {
@@ -131,6 +134,13 @@ public class TownyWarsResident{
 		return this.activeWars.contains(war);
 	}
 	
+	public boolean isInActiveWar(){
+		if (this.lastNation==null) {
+			return false;
+		}
+		return this.lastNation.isInWar();
+	}
+	
 	public TownyWarsNation getLastNation() {
 		return this.lastNation;
 	}
@@ -207,7 +217,7 @@ public class TownyWarsResident{
 		TownyWarsResident.residentToTownyWarsResidentHash.put(resident, newResident);
 		
 		// save the player immediately to the database
-		if (!TownyWars.database.insertResident(newResident)) {
+		if (!TownyWars.database.saveResident(newResident)) {
 			System.out.println("[TownyWars] database error during new resident insertion!");
 		}
 		return newResident;

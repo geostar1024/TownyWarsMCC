@@ -1,25 +1,23 @@
-package net.minecraftcenter.townywars;
+package net.minecraftcenter.townywars.object;
 
-//import java.util.HashMap;
-//import java.util.Map;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import net.minecraftcenter.townywars.TownyWars;
+
 import com.palmergames.bukkit.towny.object.Town;
 
 // some extra fields
-public class TownyWarsTown{
+public class TownyWarsTown extends TownyWarsObject {
 	
 	//private static long warTimeout=7*24*3600*1000;
 	
 	private static Map<Town,TownyWarsTown> townToTownyWarsTownHash = new HashMap<Town,TownyWarsTown>();
 	private static Map<UUID,TownyWarsTown> allTownyWarsTowns = new HashMap<UUID,TownyWarsTown>();
 	
-	private String name;
-	private UUID uuid;
 	private Town town=null;
 	private double dp=0;
 	private double maxdp=0;
@@ -29,17 +27,18 @@ public class TownyWarsTown{
 	//private Map<TownyWarsNation,Long> previousEnemies = new HashMap<TownyWarsNation,Long>();
 	
 	public TownyWarsTown(Town town){
-		newTownyWarsTown(town,UUID.randomUUID(),0,null,0,null);
+		super(UUID.randomUUID());
+		newTownyWarsTown(town,0,null,0,null);
 	}
 	
 	public TownyWarsTown(Town town, UUID uuid, int deaths, Double dp, int conquered, Double mindpfactor){
-		newTownyWarsTown(town,uuid,deaths,dp,conquered,mindpfactor);
+		super(uuid);
+		newTownyWarsTown(town,deaths,dp,conquered,mindpfactor);
 	}
 	
-	private void newTownyWarsTown(Town town, UUID uuid, int deaths, Double dp, int conquered, Double mindpfactor) {
-		this.uuid=uuid;
+	private void newTownyWarsTown(Town town, int deaths, Double dp, int conquered, Double mindpfactor) {
 		this.town=town;
-		this.name=town.getName();
+		setName(town.getName());
 		this.conquered=conquered;
 		this.maxdp=calculateMaxDP();
 		if (dp==null) {
@@ -54,20 +53,8 @@ public class TownyWarsTown{
 		}
 	}
 	
-	public UUID getUUID(){
-		return this.uuid;
-	}
-	
 	public Town getTown(){
 		return this.town;
-	}
-	
-	public String getName() {
-		return this.name;
-	}
-	
-	public void setName(String name) {
-		this.name=name;
 	}
 	
 	public void setDP(double newDP){
@@ -175,7 +162,7 @@ public class TownyWarsTown{
 		}
 		TownyWarsTown.allTownyWarsTowns.put(newTown.getUUID(),newTown);
 		TownyWarsTown.townToTownyWarsTownHash.put(town, newTown);
-		return TownyWars.database.insertTown(newTown, true);
+		return TownyWars.database.saveTown(newTown, true);
 	}
 	
 	public static boolean removeTown(UUID uuid) {
@@ -192,7 +179,7 @@ public class TownyWarsTown{
 	
 	private static boolean removetown(UUID uuid) {
 		TownyWarsTown town = TownyWarsTown.getTown(uuid);
-		boolean saveSuccess=TownyWars.database.insertTown(town, false);
+		boolean saveSuccess=TownyWars.database.saveTown(town, false);
 		TownyWarsTown.townToTownyWarsTownHash.remove(town.getTown());
 		TownyWarsTown.allTownyWarsTowns.remove(uuid);
 		return saveSuccess;

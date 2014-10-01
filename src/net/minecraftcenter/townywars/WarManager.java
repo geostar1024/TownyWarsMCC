@@ -8,8 +8,11 @@ import java.util.HashSet;
 
 import java.util.Set;
 
-import net.minecraftcenter.townywars.War.WarStatus;
-import net.minecraftcenter.townywars.War.WarType;
+import net.minecraftcenter.townywars.object.TownyWarsNation;
+import net.minecraftcenter.townywars.object.TownyWarsTown;
+import net.minecraftcenter.townywars.object.War;
+import net.minecraftcenter.townywars.object.War.WarStatus;
+import net.minecraftcenter.townywars.object.War.WarType;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;

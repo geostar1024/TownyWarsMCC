@@ -1,4 +1,4 @@
-package net.minecraftcenter.townywars;
+package net.minecraftcenter.townywars.object;
 
 import com.palmergames.bukkit.towny.exceptions.AlreadyRegisteredException;
 import com.palmergames.bukkit.towny.exceptions.NotRegisteredException;
@@ -18,7 +18,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 
-public class War {
+public class War extends TownyWarsObject {
 	
 	public static enum WarType {
 		NORMAL,
@@ -34,8 +34,6 @@ public class War {
 	}
 	
 	private static final double threshold=.3;
-	private String name=null;
-	private UUID uuid=null;
 	private long startTime=0;
 	private long endTime=0;
 	private long prewarTime=0;
@@ -56,20 +54,20 @@ public class War {
 	private Set<UUID> peaceAccepted = new HashSet<UUID>();
 	
 	public War(String name, TownyWarsNation declarer, UUID uuid) {
-		newWar(name,declarer,uuid);
+		super(uuid);
+		newWar(name,declarer);
 	}
 	
 	// use a random UUID to uniquely identify this war
 	public War(String name, TownyWarsNation declarer) {
-		newWar(name,declarer,UUID.randomUUID());
+		super(UUID.randomUUID());
+		newWar(name,declarer);
 	}
 	
 	// everything needed to start setting up a new war
 	// minimum information is a name for the war, the nation that declared, and a UUID for the war object
-	private void newWar(String name, TownyWarsNation declarer, UUID uuid) {
-		this.name=name;
-		
-		this.uuid=uuid;
+	private void newWar(String name, TownyWarsNation declarer) {
+		setName(name);
 		
 		// by default, the prewar period is 24 hours
 		this.prewarTime=24*3600*1000;
@@ -148,14 +146,6 @@ public class War {
 			return false;
 		}
 		return true;
-	}
-	
-	public String getName(){
-		return this.name;
-	}
-	
-	public UUID getUUID(){
-		return this.uuid;
 	}
 	
 	public TownyWarsNation getDeclarer(){
@@ -439,7 +429,7 @@ public class War {
 		if (this.status==WarStatus.PREPARE && resident==null) {
 			return;
 		}
-		String message=ChatColor.GOLD+"War "+ChatColor.WHITE+this.name+": "+ChatColor.GOLD;
+		String message=ChatColor.GOLD+"War "+ChatColor.WHITE+getName()+": "+ChatColor.GOLD;
 		if (all) {
 			message+=this.declarer.getName()+informPlayersSelector(this.declarer);
 			Bukkit.getServer().broadcastMessage(message);

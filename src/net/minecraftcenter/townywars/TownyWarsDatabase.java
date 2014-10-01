@@ -7,6 +7,11 @@ import java.util.List;
 import java.util.UUID;
 import java.text.SimpleDateFormat;
 
+import net.minecraftcenter.townywars.object.TownyWarsNation;
+import net.minecraftcenter.townywars.object.TownyWarsResident;
+import net.minecraftcenter.townywars.object.TownyWarsTown;
+import net.minecraftcenter.townywars.object.War;
+
 import org.bukkit.entity.Player;
 
 import com.palmergames.bukkit.towny.exceptions.NotRegisteredException;
@@ -163,7 +168,7 @@ public class TownyWarsDatabase {
 		return noerror;
 	}
 	
-	public boolean insertKill(Long deathTime, Player player, Player killer, String damageCause, String deathMessage) {
+	public boolean saveKill(Long deathTime, Player player, Player killer, String damageCause, String deathMessage) {
 		// convert the time in milliseconds to a date and then convert it to a string in a useful format (have to tack on the milliseconds)
 		// format example: 2014-08-29 EDT 10:05:25:756
 		final SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd zzz HH:mm:ss");
@@ -187,7 +192,7 @@ public class TownyWarsDatabase {
 	    return this.executeSQL(sql);
 	}
 	
-	public boolean insertNation(TownyWarsNation nation, boolean active) {
+	public boolean saveNation(TownyWarsNation nation, boolean active) {
 		String warString="";
 		String capitalString="";
 		for (War war : nation.getWars()) {
@@ -207,7 +212,7 @@ public class TownyWarsDatabase {
 		return this.executeSQL(sql);
 	}
 	
-	public boolean insertResident(TownyWarsResident resident) {
+	public boolean saveResident(TownyWarsResident resident) {
 		String warString="";
 		String lastNationUUID="";
 		if (resident.getLastNation()!=null) {
@@ -231,13 +236,13 @@ public class TownyWarsDatabase {
 		return this.executeSQL(sql);
 	}
 	
-	public boolean insertTown(TownyWarsTown town, boolean active) {
+	public boolean saveTown(TownyWarsTown town, boolean active) {
 		String sql=townyWarsTownInsert+" VALUES ('"+town.getUUID().toString()+"','"+town.getName()+"','"+Boolean.toString(active)+"',"+Integer.toString(town.getDeaths())+","
 				+Double.toString(town.getDP())+","+Double.toString(town.getMaxDP())+","+Integer.toString(town.getConquered())+","+Double.toString(town.getMinDPFactor())+");";
 		return this.executeSQL(sql);
 	}
 	
-	public boolean insertWar(War war) {
+	public boolean saveWar(War war) {
 		String nationString="";
 		String deathString="";
 		String offerString="";
@@ -264,7 +269,7 @@ public class TownyWarsDatabase {
 	public boolean saveAllTowns() {
 		boolean noerror=true;
 		for (TownyWarsTown town : TownyWarsTown.getAllTowns()) {
-			if (!this.insertTown(town, true)) {
+			if (!this.saveTown(town, true)) {
 				noerror=false;
 			}
 		}
@@ -274,7 +279,7 @@ public class TownyWarsDatabase {
 	public boolean saveAllNations() {
 		boolean noerror=true;
 		for (TownyWarsNation nation : TownyWarsNation.getAllNations()) {
-			if (!this.insertNation(nation, true)) {
+			if (!this.saveNation(nation, true)) {
 				noerror=false;
 			}
 		}
@@ -284,7 +289,7 @@ public class TownyWarsDatabase {
 	public boolean saveAllResidents() {
 		boolean noerror=true;
 		for (TownyWarsResident resident : TownyWarsResident.getAllResidents()) {
-			if (!this.insertResident(resident)) {
+			if (!this.saveResident(resident)) {
 				noerror=false;
 			}
 		}
@@ -294,7 +299,7 @@ public class TownyWarsDatabase {
 	public boolean saveAllWars() {
 		boolean noerror=true;
 		for (War war : WarManager.getWars()) {
-			if (!this.insertWar(war)) {
+			if (!this.saveWar(war)) {
 				noerror=false;
 			}
 		}
@@ -507,7 +512,8 @@ public class TownyWarsDatabase {
 					continue;
 				}
 
-				TownyWarsNation newNation = new TownyWarsNation(nation,uuid,deaths);
+				TownyWarsNation newNation = new TownyWarsNation(nation,uuid);
+				newNation.setDeaths(deaths);
 				TownyWarsNation.putNation(nation,newNation);
 				
 				int k=0;
