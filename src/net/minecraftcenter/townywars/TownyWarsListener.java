@@ -4,7 +4,6 @@ import net.minecraftcenter.townywars.object.TownyWarsNation;
 import net.minecraftcenter.townywars.object.TownyWarsResident;
 import net.minecraftcenter.townywars.object.TownyWarsTown;
 import net.minecraftcenter.townywars.object.War;
-import net.minecraftcenter.townywars.object.War.WarType;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -44,7 +43,7 @@ public class TownyWarsListener implements Listener {
 		}
 
 		// save and remove the nation
-		TownyWarsNation.removeNation(nation);
+		nation.remove();
 
 	}
 
@@ -109,7 +108,7 @@ public class TownyWarsListener implements Listener {
 		// be careful, because if this is a new town, it may not exist yet in the hashmap
 		// if it doesn't, we'll put it in now
 		if (TownyWarsTown.getTown(event.getTown()) == null) {
-			TownyWarsTown.putTown(event.getTown());
+			TownyWarsTown.putTown(new TownyWarsTown(event.getTown()));
 		}
 		final TownyWarsTown town = TownyWarsTown.getTown(event.getTown());
 		final double oldMaxDP = town.getMaxDP();
@@ -133,10 +132,8 @@ public class TownyWarsListener implements Listener {
 				}
 				// check to see if this town ceasing to exist would cause any in-progress wars to stop; if so, end them
 				if (event.getTown().getResidents().size() == 0) {
-					for (final War war : nation.getWars()) {
-						if ((war.getTargetTown().getTown() == event.getTown()) && (war.getWarType() == WarType.FLAG)) {
-							war.end();
-						}
+					for (final War war : town.getWars()) {
+						war.end();
 					}
 				}
 			}
@@ -147,7 +144,7 @@ public class TownyWarsListener implements Listener {
 
 	@EventHandler
 	public void onTownDelete(final DeleteTownEvent event) {
-		TownyWarsTown.removeTown(TownyWarsTown.getTown(event.getTownName()));
+		TownyWarsTown.getTown(event.getTownName()).remove();
 	}
 
 	// update the TownyWarsTown object if the linked Town object's name changes

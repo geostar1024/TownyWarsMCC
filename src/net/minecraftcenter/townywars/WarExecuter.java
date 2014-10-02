@@ -249,11 +249,11 @@ class WarExecutor implements CommandExecutor {
 		TownyWarsNation targetParent = null;
 		Resident resident = null;
 		if ((strings.length < 3) && (admin)) {
-			cs.sendMessage(ChatColor.RED + "You need to specify a nation and a town!");
+			cs.sendMessage(ChatColor.RED + "You need to specify two combatants!");
 			return false;
 		}
 		if (strings.length < 2) {
-			cs.sendMessage(ChatColor.RED + "You need to specify a town!");
+			cs.sendMessage(ChatColor.RED + "You need to specify a target!");
 			return false;
 		}
 		try {

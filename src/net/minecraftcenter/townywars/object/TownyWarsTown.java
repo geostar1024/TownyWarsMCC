@@ -1,195 +1,127 @@
 package net.minecraftcenter.townywars.object;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 import net.minecraftcenter.townywars.TownyWars;
 
 import com.palmergames.bukkit.towny.object.Town;
 
-// some extra fields
-public class TownyWarsTown extends TownyWarsObject {
-	
-	//private static long warTimeout=7*24*3600*1000;
-	
-	private static Map<Town,TownyWarsTown> townToTownyWarsTownHash = new HashMap<Town,TownyWarsTown>();
-	private static Map<UUID,TownyWarsTown> allTownyWarsTowns = new HashMap<UUID,TownyWarsTown>();
-	
-	private Town town=null;
-	private double dp=0;
-	private double maxdp=0;
-	private int deaths=0;
-	private int conquered=0;
-	private double mindpfactor=.1;
-	//private Map<TownyWarsNation,Long> previousEnemies = new HashMap<TownyWarsNation,Long>();
-	
-	public TownyWarsTown(Town town){
+public class TownyWarsTown extends TownyWarsOrg {
+
+	private static Map<Town, TownyWarsTown>	townToTownyWarsTownHash	= new HashMap<Town, TownyWarsTown>();
+
+	public static TownyWarsTown[] getAllTowns() {
+		return (TownyWarsTown[]) TownyWarsTown.townToTownyWarsTownHash.values().toArray();
+	}
+
+	// this is substantially slower than the other getTown methods since it has to loop over all existing towns
+	public static TownyWarsTown getTown(final String townName) {
+		for (final TownyWarsTown town : TownyWarsTown.townToTownyWarsTownHash.values()) {
+			if (town.getName().compareTo(townName) == 0) {
+				return town;
+			}
+		}
+		return null;
+	}
+
+	public static TownyWarsTown getTown(final Town town) {
+		return TownyWarsTown.townToTownyWarsTownHash.get(town);
+	}
+
+	public static TownyWarsTown getTown(final UUID uuid) {
+		if (TownyWarsOrg.getOrg(uuid) instanceof TownyWarsTown) {
+			return (TownyWarsTown) TownyWarsOrg.getOrg(uuid);
+		}
+		return null;
+	}
+
+	public static void putTown(final TownyWarsTown newTown) {
+		TownyWarsTown.townToTownyWarsTownHash.put(newTown.getTown(), newTown);
+		TownyWarsOrg.add(newTown);
+	}
+
+	private Town	town	    = null;
+
+	private int	   conquered	= 0;
+
+	private double	mindpfactor	= .1;
+
+	public TownyWarsTown(final Town town) {
 		super(UUID.randomUUID());
-		newTownyWarsTown(town,0,null,0,null);
+		townyWarsTown(town, null, 0, 0);
 	}
-	
-	public TownyWarsTown(Town town, UUID uuid, int deaths, Double dp, int conquered, Double mindpfactor){
-		super(uuid);
-		newTownyWarsTown(town,deaths,dp,conquered,mindpfactor);
+
+	public TownyWarsTown(final Town town, final UUID uuid, final int deaths, final Double dp, final int conquered, final double mindpfactor) {
+		super(uuid, deaths);
+		townyWarsTown(town, dp, conquered, mindpfactor);
+
 	}
-	
-	private void newTownyWarsTown(Town town, int deaths, Double dp, int conquered, Double mindpfactor) {
-		this.town=town;
-		setName(town.getName());
-		this.conquered=conquered;
-		this.maxdp=calculateMaxDP();
-		if (dp==null) {
-			this.setDP(this.maxdp/(Math.pow(2,this.conquered)));
-		}
-		else {
-			this.dp=dp;
-		}
-		this.deaths=deaths;
-		if (mindpfactor==null) {
-			this.mindpfactor=.1;
-		}
-	}
-	
-	public Town getTown(){
-		return this.town;
-	}
-	
-	public void setDP(double newDP){
-		this.dp=newDP;
-		if (this.dp>this.maxdp) this.dp=this.maxdp;
-		
-		// DP is allowed to go some percent negative
-		if (this.dp<-this.maxdp*this.mindpfactor) this.dp=0;
-	}
-	
-	public double getDP(){
-		return this.dp;
-	}
-	
-	public double resetDP(){
-		this.setDP(this.maxdp/(Math.pow(2,this.conquered)));
-		return this.dp;
-	}
-	
-	public double getMinDPFactor() {
-		return this.mindpfactor;
-	}
-	
-	public double modifyDP(double addedDP){
-		setDP(this.dp+addedDP);
-		return this.dp;
-	}
-	
-	public double calculateMaxDP(){
-		this.maxdp=(50-50*Math.pow(Math.E, (-0.04605*this.town.getNumResidents()))) + (60-60*Math.pow(Math.E, (-0.00203*this.town.getTownBlocks().size())));
-		return this.maxdp;
-	}
-	
-	public double getMaxDP(){
-		return this.maxdp;
-	}
-	
-	public void setDeaths(int newDeaths) {
-		this.deaths=newDeaths;
-	}
-	
-	public void addDeath(){
-		this.deaths++;
-	}
-	
-	public int getDeaths(){
-		return this.deaths;
-	}
-	
-	public void setConquered(int newConquered) {
-		this.conquered=newConquered;
-	}
-	
+
 	// the only time this method should be called is when the town has been conquered and is moving to a new nation
-	public void addConquered(){
+	public void addConquered() {
 		this.conquered++;
 		this.resetDP();
 	}
-	
-	public int getConquered(){
+
+	public double calculateMaxDP() {
+		setMaxDP((50 - (50 * Math.pow(Math.E, (-0.04605 * getTown().getNumResidents()))))
+		        + (60 - (60 * Math.pow(Math.E, (-0.00203 * getTown().getTownBlocks().size())))));
+		return getMaxDP();
+	}
+
+	public int getConquered() {
 		return this.conquered;
 	}
-	
-	// this is substantially slower than the other getTown methods since it has to loop over all existing towns
-	public static TownyWarsTown getTown(String townName) {
-		for (Map.Entry<UUID,TownyWarsTown> entry : TownyWarsTown.allTownyWarsTowns.entrySet()) {
-			if (entry.getValue().getName().compareTo(townName)==0) {
-				return entry.getValue();
-			}
+
+	public double getMinDPFactor() {
+		return this.mindpfactor;
+	}
+
+	public Town getTown() {
+		return this.town;
+	}
+
+	public double modifyDP(final double addedDP) {
+		setDP(getDP() + addedDP);
+		if (getDP() < (-getMaxDP() * getMinDPFactor())) {
+			setDP(-getMaxDP() * getMinDPFactor());
 		}
-		
-		// we didn't find an object with this name
-		return null;
+		return getDP();
 	}
-	
-	public static TownyWarsTown getTown(UUID uuid) {
-		return TownyWarsTown.allTownyWarsTowns.get(uuid);
+
+	public boolean remove() {
+		TownyWarsTown.townToTownyWarsTownHash.remove(this);
+		TownyWarsOrg.removeTownyWarsObject(this);
+		return TownyWars.database.saveTown(this, false);
 	}
-	
-	public static TownyWarsTown getTown(Town town) {
-		return TownyWarsTown.townToTownyWarsTownHash.get(town);
+
+	public double resetDP() {
+		this.setDP(getMaxDP() / (Math.pow(2, this.conquered)));
+		return getDP();
 	}
-	
-	public static Set<TownyWarsTown> getAllTowns() {
-		Set<TownyWarsTown> allTowns=new HashSet<TownyWarsTown>();
-		for (UUID uuid : TownyWarsTown.allTownyWarsTowns.keySet()) {
-			allTowns.add(TownyWarsTown.allTownyWarsTowns.get(uuid));
+
+	public void setConquered(final int conquered) {
+		this.conquered = conquered;
+	}
+
+	private void setMinDPFactor(final double mindpfactor) {
+		this.mindpfactor = mindpfactor;
+	}
+
+	private void townyWarsTown(final Town town, final Double dp, final int conquered, final double mindpfactor) {
+		this.town = town;
+		setName(town.getName());
+		calculateMaxDP();
+		setConquered(conquered);
+		if (dp == null) {
+			resetDP();
+		} else {
+			setDP(dp);
 		}
-		return allTowns;
+		setMinDPFactor(mindpfactor);
+		TownyWars.database.saveTown(this, true);
 	}
-	
-	public static boolean putTown(Town town) {
-		return puttown(town,null);
-	}
-	
-	public static boolean putTown(Town town, TownyWarsTown newTown) {
-		return puttown(town,newTown);
-	}
-	
-	private static boolean puttown(Town town, TownyWarsTown newTown) {
-		
-		// evidently the TownyWarsTown object wasn't specified, so a new one is needed
-		if (newTown==null) {
-			newTown=new TownyWarsTown(town);
-		}
-		TownyWarsTown.allTownyWarsTowns.put(newTown.getUUID(),newTown);
-		TownyWarsTown.townToTownyWarsTownHash.put(town, newTown);
-		return TownyWars.database.saveTown(newTown, true);
-	}
-	
-	public static boolean removeTown(UUID uuid) {
-		return removetown(uuid);
-	}
-	
-	public static boolean removeTown(Town town) {
-		return removetown(TownyWarsTown.getTown(town).getUUID());
-	}
-	
-	public static boolean removeTown(TownyWarsTown town) {
-		return removetown(town.getUUID());
-	}
-	
-	private static boolean removetown(UUID uuid) {
-		TownyWarsTown town = TownyWarsTown.getTown(uuid);
-		boolean saveSuccess=TownyWars.database.saveTown(town, false);
-		TownyWarsTown.townToTownyWarsTownHash.remove(town.getTown());
-		TownyWarsTown.allTownyWarsTowns.remove(uuid);
-		return saveSuccess;
-	}
-	
-	public static void printtowns(){
-		  for (Map.Entry<UUID,TownyWarsTown> entry : TownyWarsTown.allTownyWarsTowns.entrySet()) {
-			  System.out.println(entry.getValue());
-		  }
-	  }
-	
 
 }

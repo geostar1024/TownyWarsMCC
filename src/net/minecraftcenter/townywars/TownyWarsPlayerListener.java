@@ -2,6 +2,7 @@ package net.minecraftcenter.townywars;
 
 import java.util.UUID;
 
+import net.minecraftcenter.townywars.interfaces.Attackable;
 import net.minecraftcenter.townywars.object.TownyWarsNation;
 import net.minecraftcenter.townywars.object.TownyWarsResident;
 import net.minecraftcenter.townywars.object.TownyWarsTown;
@@ -85,7 +86,7 @@ public class TownyWarsPlayerListener implements Listener {
 			} catch (final NotRegisteredException e) {
 				// safely ignoreable since we've just created the new nation
 			}
-			TownyWarsNation.putNation(nation);
+			TownyWarsNation.putNation(new TownyWarsNation(nation));
 			TownyUniverse.getDataSource().saveAll();
 		}
 	}
@@ -288,9 +289,9 @@ public class TownyWarsPlayerListener implements Listener {
 				for (final War war : nation.getWars()) {
 					war.informPlayers(newResident);
 					if (nation.getNation().hasAssistant(newResident.getResident()) || newResident.getResident().isKing()) {
-						final TownyWarsNation enemy = war.getEnemy(nation);
+						final Attackable enemy = war.getEnemy(nation);
 						if (war.getPeaceOffer(enemy) != null) {
-							player.sendMessage(ChatColor.GREEN + enemy.getNation().getName() + " has offered you peace:");
+							player.sendMessage(ChatColor.GREEN + enemy.getName() + " has offered you peace:");
 							player.sendMessage(war.getPeaceOffer(enemy));
 						}
 					}

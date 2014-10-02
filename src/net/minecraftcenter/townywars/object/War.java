@@ -14,100 +14,96 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import net.minecraftcenter.townywars.interfaces.Attackable;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 
 public class War extends TownyWarsObject {
-	
+
+	public static List<Attackable>	testmap	= new ArrayList<Attackable>();
+
 	public static enum WarType {
-		NORMAL,
-		REBELLION,
-		FLAG,
+		NORMAL, REBELLION, RAID,
 	}
-	
+
 	public static enum WarStatus {
-		PREPARE,
-		PREWAR,
-		CURRENT,
-		ENDED,
+		PREPARE, PREWAR, CURRENT, ENDED,
 	}
-	
-	private static final double threshold=.3;
-	private long startTime=0;
-	private long endTime=0;
-	private long prewarTime=0;
-	private WarType type=null;
-	private WarStatus status=null;
-	private TownyWarsTown targetTown=null;
-	private TownyWarsNation target=null;
-	private TownyWarsNation declarer=null;
-	private TownyWarsNation winner=null;
-	private String targetTownName=null;
-	private String targetName=null;
-	private String declarerName=null;
-	
-	
-	private Map<UUID,String> peaceOffers = new HashMap<UUID,String>();
-	private Map<UUID,Double> requestedMoney = new HashMap<UUID,Double>();
-	private Map<UUID,Integer> deaths = new HashMap<UUID,Integer>();
-	private Set<UUID> peaceAccepted = new HashSet<UUID>();
-	
-	public War(String name, TownyWarsNation declarer, UUID uuid) {
+
+	private static final double	threshold	   = .3;
+	private long	            startTime	   = 0;
+	private long	            endTime	       = 0;
+	private long	            prewarTime	   = 0;
+	private WarType	            type	       = null;
+	private WarStatus	        status	       = null;
+	private Attackable	        target	       = null;
+	private Attackable	        declarer	   = null;
+	private Attackable	        winner	       = null;
+
+	private Map<UUID, String>	peaceOffers	   = new HashMap<UUID, String>();
+	private Map<UUID, Double>	requestedMoney	= new HashMap<UUID, Double>();
+	private Map<UUID, Integer>	deaths	       = new HashMap<UUID, Integer>();
+	private Set<UUID>	        peaceAccepted	= new HashSet<UUID>();
+
+	public War(String name, Attackable declarer2, UUID uuid) {
 		super(uuid);
-		newWar(name,declarer);
+		newWar(name, declarer2);
 	}
-	
+
 	// use a random UUID to uniquely identify this war
-	public War(String name, TownyWarsNation declarer) {
+	public War(String name, TownyWarsOrg declarer) {
 		super(UUID.randomUUID());
-		newWar(name,declarer);
+		newWar(name, declarer);
 	}
-	
+
 	// everything needed to start setting up a new war
-	// minimum information is a name for the war, the nation that declared, and a UUID for the war object
-	private void newWar(String name, TownyWarsNation declarer) {
+	// minimum information is a name for the war, the organization that declared, and a UUID for the war object
+	private void newWar(String name, Attackable declarer) {
 		setName(name);
-		
+
 		// by default, the prewar period is 24 hours
-		this.prewarTime=24*3600*1000;
-		
+		this.prewarTime = 24 * 3600 * 1000;
+
 		// by default, all wars start in the preparation phase
-		this.status=WarStatus.PREPARE;
-		
+		this.status = WarStatus.PREPARE;
+
 		// the creator of the war is by default the declarer
-		this.declarer=declarer;
-		
+		this.declarer = declarer;
+
 		this.deaths.put(declarer.getUUID(), 0);
+
+		//testmap.add(new TownyWarsNation((Nation) this.declarer.getObject()));
+		//testmap.add(new TownyWarsTown((Town) this.declarer.getObject()));
 	}
-	
-	
+
 	// time to start the war!
 	public boolean execute() {
-		
+
 		// make sure the war is sufficiently set up
 		if (!checkWar()) {
 			System.out.println("war not setup correctly!");
 			return false;
 		}
-		
+
 		// record the war start time and set the status to CURRENT
-		this.startTime=System.currentTimeMillis();
-		this.status=WarStatus.CURRENT;
-		
-		// store the reference to this war in each of the TownyWarNation objects
-		for (TownyWarsNation nation : this.getNations()) {
-			nation.addWar(this);
+		this.startTime = System.currentTimeMillis();
+		this.status = WarStatus.CURRENT;
+
+		// store the reference to this war in each of the TownyWarOrg objects
+		for (Attackable org : this.getOrgs()) {
+			org.addWar(this);
 		}
-		
+
 		// make all nations in this war enemies!
-		for (TownyWarsNation nation1 : this.getNations()) {
-			for (TownyWarsNation nation2 : this.getNations()) {
-				if (nation1!=nation2) {
+		for (Attackable org1 : this.getOrgs()) {
+			for (Attackable org2 : this.getOrgs()) {
+				if (org1 != org2) {
 					try {
-						// if the nations are already allies, don't set them to be enemies!
-						if (!nation1.getNation().hasAlly(nation2.getNation())) {
-							nation1.getNation().addEnemy(nation2.getNation());
+						// skip enemies stuff if the orgs are just towns
+						if (org1 instanceof TownyWarsNation && org2 instanceof TownyWarsNation) {
+							((TownyWarsNation) org1).getNation().addEnemy(((TownyWarsNation) org2).getNation());
 						}
 					} catch (AlreadyRegisteredException e) {
 						// ignore if a nation is already the enemy of another nation; could happen if two nations happen to be in multiple wars
@@ -115,459 +111,405 @@ public class War extends TownyWarsObject {
 				}
 			}
 		}
-		
-		// turn on pvp for all the towns in all the nations at war!
-		if (this.type!=WarType.FLAG) {
-			for (TownyWarsNation nation : this.getNations()) {
-				for (Town town : nation.getNation().getTowns()) {
+
+		// turn on pvp for all the towns in all the orgs at war!
+		for (Attackable org : this.getOrgs()) {
+			if (org instanceof TownyWarsNation) {
+				for (Town town : ((TownyWarsNation) org).getNation().getTowns()) {
 					town.setPVP(true);
 				}
 			}
-		}
-		// but if it's a flag war, only turn on pvp for the aggressor and the target town(s)
-		else {
-			for (Town town : this.declarer.getNation().getTowns()) {
-				town.setPVP(true);
+			if (org instanceof TownyWarsTown) {
+				((TownyWarsTown) org).getTown().setPVP(true);
 			}
-			this.targetTown.getTown().setPVP(true);
 		}
-		
+
 		// save the stuff we've been doing
-		TownyUniverse.getDataSource().saveTowns();
-	    TownyUniverse.getDataSource().saveNations();
-	    
-	    informPlayers(true);
-	    return true;
+		TownyUniverse.getDataSource().saveAll();
+
+		informPlayers(true);
+		return true;
 	}
-	
+
 	// determine if enough war parameters are set
 	boolean checkWar() {
-		if (this.type==null || (this.target==null && this.type==WarType.FLAG) || this.getNations().size()<2) {
+		if (this.type == null || (this.target == null && this.type == WarType.RAID) || this.getOrgs().size() < 2) {
 			return false;
 		}
 		return true;
 	}
-	
-	public TownyWarsNation getDeclarer(){
+
+	public Attackable getDeclarer() {
 		return this.declarer;
 	}
-	
+
 	public void setStartTime(long time) {
-		this.startTime=time;
+		this.startTime = time;
 	}
-	
-	public List<TownyWarsNation> getNations(){
-		List<TownyWarsNation> allNations=new ArrayList<TownyWarsNation>();
-		allNations.add(this.declarer);
-		allNations.add(this.target);
-		return allNations;
+
+	public List<Attackable> getOrgs() {
+		List<Attackable> allOrgs = new ArrayList<Attackable>();
+		allOrgs.add(this.declarer);
+		allOrgs.add(this.target);
+		return allOrgs;
 	}
-	
+
 	public WarType getWarType() {
 		return this.type;
 	}
-	
+
 	public WarStatus getWarStatus() {
 		return this.status;
 	}
-	
+
 	public void setWarStatus(WarStatus status) {
-		this.status=status;
+		this.status = status;
 	}
-	
+
 	public static double getThreshold() {
 		return threshold;
 	}
-	
+
 	public boolean setWarType(WarType type) {
 		// only allow this modification before the war is executed
-		if (this.status!=WarStatus.PREPARE) {
+		if (this.status != WarStatus.PREPARE) {
 			return false;
 		}
-		this.type=type;
+		this.type = type;
 		return true;
 	}
-	
-	public TownyWarsNation getWinner() {
+
+	public Attackable getWinner() {
 		return this.winner;
 	}
-	
-	public void setWinner(TownyWarsNation winner) {
-		this.winner=winner;
+
+	public void setWinner(Attackable winner) {
+		this.winner = winner;
 	}
-	
-	public String getTargetName() {
-		if (this.targetName!=null) {
-			return this.targetName;
-		}
-		if (this.target!=null) {
-			try {
-				return this.target.getNation().getName();
-			} catch (Exception e) {
-				return null;
-			}
-		}
-		return null;
-	}
-	
-	public String getDeclarerName() {
-		if (this.declarerName!=null) {
-			return this.declarerName;
-		}
-		if (this.declarer!=null) {
-			try {
-				return this.declarer.getNation().getName();
-			} catch (Exception e) {
-				return null;
-			}
-		}
-		return null;
-	}
-	
-	public String getTargetTownName() {
-		if (this.targetTownName!=null) {
-			return this.targetTownName;
-		}
-		if (this.targetTown!=null) {
-			try {
-				return this.targetTown.getTown().getName();
-			} catch (Exception e) {
-				return null;
-			}
-		}
-		return null;
-	}
-	
-	public TownyWarsNation getTarget() {
+
+	public Attackable getTarget() {
 		return this.target;
 	}
-	
-	public void setTarget(TownyWarsNation nation) {
-		if (this.target!=null) {
+
+	public void setTarget(Attackable org) {
+		if (this.target != null) {
 			this.deaths.remove(this.target.getUUID());
 		}
-		this.target=nation;
+		this.target = org;
 		this.deaths.put(this.target.getUUID(), 0);
-		
+
 	}
-	
-	public TownyWarsTown getTargetTown() {
-		return this.targetTown;
-	}
-	
-	public boolean setTargetTown(TownyWarsTown town) {
-		this.targetTown=town;
-		TownyWarsNation nation=null;
-		
-		// attempt to add this town's parent nation to the war
-		try {
-			nation=TownyWarsNation.getNation(town.getTown().getNation());	
-		} catch (NotRegisteredException e) {
-			
-			// the town needs to be in a nation, or it is not a valid target at this point
-			return false;
-		}
-		setTarget(nation);
-		return true;
-	}
-	
-	public long getStartTime(){
+
+	public long getStartTime() {
 		return this.startTime;
 	}
-	
-	public long getEndTime(){
+
+	public long getEndTime() {
 		return this.endTime;
 	}
-	
+
 	public void setEndTime(long time) {
-		this.endTime=time;
+		this.endTime = time;
 	}
-	
-	public int getDeaths(TownyWarsNation nation){
-		return this.deaths.get(nation);
+
+	public int getDeaths(Attackable org) {
+		return this.deaths.get(org.getUUID());
 	}
-	
-	public void setDeaths(TownyWarsNation nation, int deaths) {
-		this.deaths.put(nation.getUUID(),deaths);
+
+	public void setDeaths(Attackable org, int deaths) {
+		this.deaths.put(org.getUUID(), deaths);
 	}
-	
-	public String getPeaceOffer(TownyWarsNation nation) {
-		return this.peaceOffers.get(nation.getUUID());
+
+	public String getPeaceOffer(Attackable org) {
+		return this.peaceOffers.get(org.getUUID());
 	}
-	
-	public boolean offeredPeace(TownyWarsNation nation) {
-		return (this.peaceOffers.get(nation.getUUID())!=null);
+
+	public boolean offeredPeace(Attackable org) {
+		return (this.peaceOffers.get(org.getUUID()) != null);
 	}
-	
-	public boolean acceptedPeace(TownyWarsNation nation) {
-		return this.peaceAccepted.contains(nation.getUUID());
+
+	public boolean acceptedPeace(Attackable org) {
+		return this.peaceAccepted.contains(org.getUUID());
 	}
-	
-	public void acceptPeace(TownyWarsNation nation) {
-		this.peaceAccepted.add(nation.getUUID());
+
+	public void acceptPeace(Attackable org) {
+		this.peaceAccepted.add(org.getUUID());
 	}
-	
-	public void setPeaceOffer(TownyWarsNation nation, String peaceOffer) {
-		this.peaceOffers.put(nation.getUUID(), peaceOffer);
+
+	public void setPeaceOffer(Attackable org, String peaceOffer) {
+		this.peaceOffers.put(org.getUUID(), peaceOffer);
 	}
-	
-	public boolean allPeaceOffered(){
-		for (TownyWarsNation nation : this.getNations()) {
-			if (this.peaceOffers.get(nation.getUUID())==null) {
+
+	public boolean allPeaceOffered() {
+		for (Attackable org : this.getOrgs()) {
+			if (this.peaceOffers.get(org.getUUID()) == null) {
 				return false;
 			}
 		}
 		return true;
 	}
-	
+
 	public boolean allPeaceAccepted() {
-		for (TownyWarsNation nation : this.getNations()) {
-			if (!this.peaceAccepted.contains(nation.getUUID())) {
+		for (Attackable org : this.getOrgs()) {
+			if (!this.peaceAccepted.contains(org.getUUID())) {
 				return false;
 			}
 		}
 		return true;
 	}
-	
-	public double getRequestedMoney(TownyWarsNation nation) {
-		return this.requestedMoney.get(nation.getUUID());
+
+	public double getRequestedMoney(Attackable org) {
+		return this.requestedMoney.get(org.getUUID());
 	}
-	
-	public void setRequestedMoney(TownyWarsNation nation, double money) {
-		this.requestedMoney.put(nation.getUUID(),money);
+
+	public void setRequestedMoney(TownyWarsOrg org, double money) {
+		this.requestedMoney.put(org.getUUID(), money);
 	}
-	
-	public TownyWarsNation checkWinner(){
-		switch(this.type) {
-		case FLAG:
-			// if the target town's DP or the DP of the target town's nation is depleted below the threshold, the declarer wins
-			if (targetTown.getDP()/targetTown.getMaxDP()<threshold || target.getDP()/target.getMaxDP()<threshold) {
+
+	public Attackable checkWinner() {
+		switch (this.type) {
+		case RAID:
+			// if the target town's DP or the DP of the target town's org is depleted below the threshold, the declarer wins
+			if (target.getDP() / target.getMaxDP() < threshold) {
 				return this.declarer;
 			}
-			
+
 			// if the declarer's DP is depleted below the threshold, the target wins
-			if (this.declarer.getDP()/this.declarer.getMaxDP()<threshold) {
+			if (this.declarer.getDP() / this.declarer.getMaxDP() < threshold) {
 				return this.target;
 			}
 			break;
 		case NORMAL:
-			if (this.getNations().size()==1) {
-				for (TownyWarsNation nation : this.getNations()) {
-					return nation;
+			if (this.getOrgs().size() == 1) {
+				for (Attackable org : this.getOrgs()) {
+					return org;
 				}
 			}
 			break;
 		case REBELLION:
-			// check if the parent nation has been brought to its knees
-			if (target.getDP()/target.getMaxDP()<threshold) {
+			// check if the parent org has been brought to its knees
+			if (target.getDP() / target.getMaxDP() < threshold) {
 				return this.declarer;
 			}
-			
-			// if the rebel nation's DP is depleted below the threshold, the parent nation wins
-			if (this.declarer.getDP()/this.declarer.getMaxDP()<threshold) {
+
+			// if the rebel org's DP is depleted below the threshold, the parent org wins
+			if (this.declarer.getDP() / this.declarer.getMaxDP() < threshold) {
 				return this.target;
 			}
-			// no nation has won yet
+			// no org has won yet
 			break;
 		default:
 			break;
 		}
 		return null;
 	}
-	
-	public TownyWarsNation getEnemy(TownyWarsNation nation){
-		if (nation==this.declarer) {
+
+	public Attackable getEnemy(Attackable declarer) {
+		if (declarer == this.declarer) {
 			return this.target;
-		}
-		else {
+		} else {
 			return this.declarer;
 		}
 	}
-	
-	public boolean hasMember(TownyWarsNation nation) {
-		return (this.getNations().contains(nation));
+
+	public boolean hasMember(TownyWarsOrg org) {
+		return (this.getOrgs().contains(org));
 	}
-	
+
 	// make sure that the prewar time is between 24 and 48 hours, otherwise return false
 	public boolean setPrewarTime(long time) {
-		if (time>24*3600*1000 && time<48*3600*1000) {
-			this.prewarTime=time;
+		if (time > 24 * 3600 * 1000 && time < 48 * 3600 * 1000) {
+			this.prewarTime = time;
 			return true;
 		}
 		return false;
 	}
-	
+
 	public long getPrewarTime() {
 		return this.prewarTime;
 	}
-	
+
 	public long getElapsedTime(WarStatus status) {
-		switch(status) {
+		switch (status) {
 		case PREPARE:
 			return 0;
 		case PREWAR:
-			return System.currentTimeMillis()-this.prewarTime;
+			return System.currentTimeMillis() - this.prewarTime;
 		case ENDED:
-			return this.endTime-this.startTime;
+			return this.endTime - this.startTime;
 		default:
-			return System.currentTimeMillis()-this.startTime;
+			return System.currentTimeMillis() - this.startTime;
 		}
-		
+
 	}
 
 	// let all or just the players in this war know its current status as long as it's not in the prepare phase (that would be awkward)
 	// if a particular player is specified, let them know the current status of this war even if it's being prepared
 	public void informPlayers(TownyWarsResident resident) {
-		informplayers(resident,false);
+		informplayers(resident, false);
 	}
-	
+
 	public void informPlayers(boolean all) {
-		informplayers(null,true);
+		informplayers(null, true);
 	}
-		
+
 	private void informplayers(TownyWarsResident resident, boolean all) {
-		if (this.status==WarStatus.PREPARE && resident==null) {
+		if (this.status == WarStatus.PREPARE && resident == null) {
 			return;
 		}
-		String message=ChatColor.GOLD+"War "+ChatColor.WHITE+getName()+": "+ChatColor.GOLD;
+		String message = ChatColor.GOLD + "War " + ChatColor.WHITE + getName() + ": " + ChatColor.GOLD;
 		if (all) {
-			message+=this.declarer.getName()+informPlayersSelector(this.declarer);
+			message += ((TownyWarsOrg)this.declarer).getName() + informPlayersSelector(this.declarer);
 			Bukkit.getServer().broadcastMessage(message);
 			return;
 		}
-		
-		if (resident!=null) {
-			TownyWarsNation nation=null;
+
+		if (resident != null) {
+			Attackable org = null;
 			try {
-				nation=TownyWarsNation.getNation(resident.getResident().getTown().getNation());
+				org = TownyWarsNation.getNation(resident.getResident().getTown().getNation());
 			} catch (NotRegisteredException e) {
-				// just continue, it isn't fatal if this resident isn't in a nation
+				// just continue, it isn't fatal if this resident isn't in a org
 			}
-			if (nation==this.declarer) {
-				message+="Your nation";
+			if (org == this.declarer) {
+				message += "Your org";
+			} else {
+				message += ((TownyWarsOrg)this.declarer).getName();
 			}
-			else {
-				message+=this.declarer.getName();
-			}
-			message+=informPlayersSelector(this.declarer);
+			message += informPlayersSelector(this.declarer);
 			resident.getPlayer().sendMessage(message);
 			return;
 		}
-		for (TownyWarsNation nation : this.getNations()) {
-			if (nation==this.declarer) {
-				message+="Your nation";
+		for (Attackable org : this.getOrgs()) {
+			if (org == this.declarer) {
+				message += "Your org";
+			} else {
+				message += org.getName();
 			}
-			else {
-				message+=nation.getNation().getName();
-			}
-			message+=informPlayersSelector(this.declarer);
+			message += informPlayersSelector(this.declarer);
 
-		  	// display for all players in the nation
-			for (Resident resident1 : nation.getNation().getResidents()) {
-				Player plr = Bukkit.getPlayer(resident1.getName());
-			      if (plr != null) {  
-			        plr.sendMessage(message);
-			      }
+			// display for all players in the org
+			if (org instanceof TownyWarsTown) {
+				for (Resident resident1 : ((TownyWarsTown) org).getTown().getResidents()) {
+					Player plr = Bukkit.getPlayer(resident1.getName());
+					if (plr != null) {
+						plr.sendMessage(message);
+					}
+				}
 			}
-		 }
+			if (org instanceof TownyWarsNation) {
+				for (Resident resident1 : ((TownyWarsNation) org).getNation().getResidents()) {
+					Player plr = Bukkit.getPlayer(resident1.getName());
+					if (plr != null) {
+						plr.sendMessage(message);
+					}
+				}
+			}
+		}
 
 	}
-	
-	private String informPlayersSelector(TownyWarsNation nation) {
-		String message=" ";
-		switch(this.status) {
+
+	private String informPlayersSelector(Attackable declarer) {
+		String message = " ";
+		switch (this.status) {
 		case CURRENT:
-			message+="is in";
+			message += "is in";
 			break;
 		case ENDED:
-			if (nation==this.winner) {
-				message+="won";
-			}
-			else if (this.winner==null) {
-				message+="made peace in";
-			}
-			else {
-				message+="lost";
+			if (declarer == this.winner) {
+				message += "won";
+			} else if (this.winner == null) {
+				message += "made peace in";
+			} else {
+				message += "lost";
 			}
 			break;
 		case PREWAR:
-			message+="is threatening";
+			message += "is threatening";
 			break;
 		case PREPARE:
-			message+="is preparing";
+			message += "is preparing";
 			break;
 		default:
 			break;
 		}
-		message+=" a ";
-		switch(this.type){
-		case FLAG:
-			message+="flag war";
+		message += " a ";
+		switch (this.type) {
+		case RAID:
+			message += "flag war";
 			break;
 		case NORMAL:
-			message+="war";
+			message += "war";
 			break;
 		case REBELLION:
-			message+="rebellion";
+			message += "rebellion";
 			break;
 		default:
 			break;
 		}
-		
+
 		// now handle the enemy
-		message+=" against "+this.getEnemy(nation).getName();
+		message += " against " + ((TownyWarsOrg)this.getEnemy(declarer)).getName();
 		return message;
 	}
-	
+
 	// immediately end the war for everyone involved
 	public void end() {
 		this.setWinner(this.checkWinner());
 		// indicate that the war has ended
-		this.status=WarStatus.ENDED;
-		this.endTime=System.currentTimeMillis();
-		
+		this.status = WarStatus.ENDED;
+		this.endTime = System.currentTimeMillis();
+
 		this.informPlayers(true);
-		for (TownyWarsNation nation : this.getNations()) {
-			nation.removeWar(this);
-			
-			// make this nation neutral (remove from enemies lists)
-			// and remove the other nations in the war from its enemies list
-			for (TownyWarsNation nation1 : this.getNations()) {
-				if (nation!=nation1) {
-					nation1.getNation().getEnemies().remove(nation);
-					nation.getNation().getEnemies().remove(nation1);
+		for (Attackable org1 : this.getOrgs()) {
+			org1.removeWar(this);
+
+			// make this org neutral (remove from enemies lists)
+			// and remove the other orgs in the war from its enemies list
+			for (Attackable org2 : this.getOrgs()) {
+				if (org1 != org2) {
+					// skip enemies stuff if the orgs are just towns
+					if (org1.getClass().equals(TownyWarsTown.class) || org2.getClass().equals(TownyWarsTown.class)) {
+						continue;
+					}
+					try {
+						((TownyWarsNation) org1).getNation().removeEnemy(((TownyWarsNation) org2).getNation());
+						((TownyWarsNation) org2).getNation().removeEnemy(((TownyWarsNation) org1).getNation());
+					} catch (NotRegisteredException e) {
+						// evidently the nations weren't enemies for whatever reason, so just continue
+					}
 				}
 			}
-			
-			// turn off pvp for all the towns in this nation, as long as it's not in other wars
+
+			// turn off pvp for all the towns in this org, as long as it's not in other wars
 			// also reset the conquest counter
-			if (nation.getWars().isEmpty()) {
-				for (Town town : nation.getNation().getTowns()) {
-					town.setPVP(false);
-					TownyWarsTown.getTown(town).setConquered(0);
+			if (org1.getWars().isEmpty()) {
+				if (org1.getClass().equals(TownyWarsNation.class)) {
+					for (Town town : ((TownyWarsNation) org1).getNation().getTowns()) {
+						town.setPVP(false);
+						TownyWarsTown.getTown(town).setConquered(0);
+					}
+				}
+				if (org1.getClass().equals(TownyWarsTown.class)) {
+					((TownyWarsTown) org1).getTown().setPVP(false);
+					((TownyWarsTown) org1).setConquered(0);
 				}
 			}
 		}
-		
-		// save the names of the nations and town in this war
-		this.declarerName=this.declarer.getName();
-		this.targetName=this.target.getName();
-		this.targetTownName=this.targetTown.getName();
-		
-		
+
 		// finally, handle the special case of a rebellion ending not in the rebels' favor
-		if (this.type==WarType.REBELLION && this.winner!=this.declarer) {
-			TownyWarsTown loser=TownyWarsTown.getTown(this.declarer.getNation().getCapital());
+		if (this.type == WarType.REBELLION && this.winner != this.declarer) {
+			// TownyWarsTown loser = TownyWarsTown.getTown(this.declarer.getObject().getCapital());
 			try {
-				this.declarer.getNation().removeTown(loser.getTown());
-				this.winner.getNation().addTown(loser.getTown());
+				// this.declarer.getObject().removeTown(loser.getTown());
+				((TownyWarsNation) this.winner).getNation().addTown(((TownyWarsTown) this.declarer).getTown());
 			} catch (Exception e) {
 				System.out.println("[TownyWars] cleaning up after failed rebellion failed catastrophically!");
 				e.printStackTrace();
 			}
-			TownyUniverse.getDataSource().removeNation(this.declarer.getNation());
-			
-			TownyWarsNation.removeNation(this.declarer);
+			// TownyUniverse.getDataSource().removeObject(this.declarer.getObject());
+
+			// TownyWarsObject.removeObject(this.declarer);
 		}
 
 		// save the stuff we've been doing

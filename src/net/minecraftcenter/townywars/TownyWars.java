@@ -6,11 +6,12 @@ import com.palmergames.bukkit.towny.object.Nation;
 import com.palmergames.bukkit.towny.object.Town;
 import com.palmergames.bukkit.towny.object.TownyUniverse;
 
+import net.minecraftcenter.townywars.interfaces.Attackable;
 import net.minecraftcenter.townywars.object.TownyWarsNation;
+
 import net.minecraftcenter.townywars.object.TownyWarsResident;
 import net.minecraftcenter.townywars.object.TownyWarsTown;
 import net.minecraftcenter.townywars.object.War;
-import net.minecraftcenter.townywars.object.War.WarType;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -33,9 +34,9 @@ public class TownyWars extends JavaPlugin {
   public void onDisable()
   {
 	  
-	  if (!database.saveAll()) {
-		  System.out.println("[ERROR] could not save TownyWars state!!");
-	  }
+	  //if (!database.saveAll()) {
+		//  System.out.println("[ERROR] could not save TownyWars state!!");
+	  //}
 	  database.close();
   }
   
@@ -60,25 +61,28 @@ public class TownyWars extends JavaPlugin {
     // create necessary database tables if they don't already exist
     database.createTables();
     
-    setupTownyWarsHashMaps();
+    database.loadAll();
+    
+    //setupTownyWarsHashMaps();
     
     // load the current wars and set the PvP flag appropriately
     
     for (War war : WarManager.getWars()) {
     	// store the reference to this war in each of the TownyWarNation objects
-		for (TownyWarsNation nation : war.getNations()) {
-			nation.addWar(war);
+		for (Attackable org : war.getOrgs()) {
+			org.addWar(war);
 		}
 		
 		// make all nations in this war enemies!
-		for (TownyWarsNation nation1 : war.getNations()) {
-			for (TownyWarsNation nation2 : war.getNations()) {
-				if (nation1!=nation2) {
+		for (Attackable org1 : war.getOrgs()) {
+			for (Attackable org2 : war.getOrgs()) {
+				if (org1!=org2) {
 					try {
-						// if the nations are already allies, don't set them to be enemies!
-						if (!nation1.getNation().hasAlly(nation2.getNation())) {
-							nation1.getNation().addEnemy(nation2.getNation());
+						// skip enemies stuff if the orgs are just towns
+						if (org1.getClass().equals(TownyWarsTown.class) || org2.getClass().equals(TownyWarsTown.class)) {
+							continue;
 						}
+							((TownyWarsNation)org1).getNation().addEnemy(((TownyWarsNation)org2).getNation());
 					} catch (AlreadyRegisteredException e) {
 						// ignore if a nation is already the enemy of another nation; could happen if two nations happen to be in multiple wars
 					}
@@ -86,27 +90,22 @@ public class TownyWars extends JavaPlugin {
 			}
 		}
 		
-		// turn on pvp for all the towns in all the nations at war!
-		if (war.getWarType()!=WarType.FLAG) {
-			for (TownyWarsNation nation : war.getNations()) {
-				for (Town town : nation.getNation().getTowns()) {
+		// turn on pvp for all the towns in all the orgs at war!
+		for (Attackable org : war.getOrgs()) {
+			if (org.getClass().equals(TownyWarsNation.class)) {
+				for (Town town : ((TownyWarsNation)org).getNation().getTowns()){
 					town.setPVP(true);
 				}
 			}
-		}
-		// but if it's a flag war, only turn on pvp for the aggressor and the target town(s)
-		else {
-			for (Town town : war.getDeclarer().getNation().getTowns()) {
-				town.setPVP(true);
+			if (org.getClass().equals(TownyWarsTown.class)) {
+				((TownyWarsTown)org).getTown().setPVP(true);
 			}
-			war.getTargetTown().getTown().setPVP(true);
 		}
 
     }
     
     
-    TownyUniverse.getDataSource().saveNations();
-    TownyUniverse.getDataSource().saveTowns();
+    TownyUniverse.getDataSource().saveAll();
     
     getConfig().addDefault("pper-player", Double.valueOf(2.0D));
     getConfig().addDefault("pper-plot", Double.valueOf(0.5D));
@@ -143,18 +142,15 @@ public class TownyWars extends JavaPlugin {
   
   public void setupTownyWarsHashMaps(){
 	  for (Nation nation : TownyUniverse.getDataSource().getNations()) {
-		  System.out.println(nation);
 		  if (TownyWarsNation.getNation(nation)==null){
-			  TownyWarsNation.putNation(nation, new TownyWarsNation(nation));
+			  TownyWarsNation.putNation(new TownyWarsNation(nation));
 		  }
 	  }
-	  TownyWarsNation.printnations();
 	  for (Town town : TownyUniverse.getDataSource().getTowns()) {
 		  if (TownyWarsTown.getTown(town)==null){
-			  TownyWarsTown.putTown(town, new TownyWarsTown(town));
+			  TownyWarsTown.putTown(new TownyWarsTown(town));
 		  }
 	  }
-	  TownyWarsTown.printtowns();
   }
   
 }
