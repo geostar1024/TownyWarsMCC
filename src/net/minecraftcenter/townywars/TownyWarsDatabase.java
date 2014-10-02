@@ -34,7 +34,8 @@ public class TownyWarsDatabase {
 		}
 	}
 
-	public static final String[]	tableNames	         = { "townywarsresidents", "townywarstowns", "townywarsnations", "townywarswars", "townywarsdeaths" };
+	public static final String[]	tableNames	         = { "townywarsresidents", "townywarstowns", "townywarsnations", "townywarswars", "townywarsdeaths",
+	        "townywarswarsstart"	                     };
 
 	public static final String[]	tableCreation	     = {
 	        "CREATE TABLE " + tableNames[0] + "(uuid TEXT PRIMARY KEY NOT NULL," + " name TEXT NOT NULL," + " nation TEXT," + " hit LONG DEFAULT 0,"
@@ -53,13 +54,19 @@ public class TownyWarsDatabase {
 	                + " accepted TEXT," + " money TEXT)",
 
 	        "CREATE TABLE " + tableNames[4] + "(time LONG PRIMARY KEY NOT NULL," + " date TEXT NOT NULL," + " puuid TEXT NOT NULL," + " pname TEXT NOT NULL,"
-	                + " auuid TEXT," + " aname TEXT," + " cause TEXT," + " message TEXT)" };
+	                + " auuid TEXT," + " aname TEXT," + " cause TEXT," + " message TEXT)",
+
+	        "CREATE TABLE " + tableNames[5] + "(uuid TEXT PRIMARY KEY NOT NULL," + " name TEXT NOT NULL," + " start LONG DEFAULT 0," + " end LONG DEFAULT 0,"
+	                + " prewar LONG DEFAULT 86400000," + " type TEXT DEFAULT 'NORMAL'," + " status TEXT DEFAULT 'PREPARE'," + " declarer TEXT,"
+	                + " target TEXT," + " winner TEXT," + " threshold DOUBLE DEFAULT .3," + " orgs TEXT," + " deaths TEXT," + " offers TEXT,"
+	                + " accepted TEXT," + " money TEXT)" };
 
 	public static final String	 townyWarsTownInsert	 = "replace into townywarstowns (uuid,name,active,deaths,dp,maxdp,conquered,mindpfactor)";
 	public static final String	 townyWarsNationInsert	 = "replace into townywarsnations (uuid,name,active,deaths,wars,capitalpriority)";
 	public static final String	 townyWarsWarInsert	     = "replace into townywarswars (uuid,name,start,end,prewar,type,status,declarer,target,winner,threshold,orgs,offers,accepted,money)";
 	public static final String	 townyWarsResidentInsert	= "replace into townywarsresidents (uuid,name,nation,hit,attacker,login,logout,playtime,wars)";
 	public static final String	 townyWarsDeathInsert	 = "replace into townywarsdeaths (time,date,puuid,pname,auuid,aname,cause,message)";
+	public static final String	 townyWarsWarStartInsert	= "replace into townywarswarsstart (uuid,name,start,end,prewar,type,status,declarer,target,winner,threshold,orgs,offers,accepted,money)";
 
 	public static Connection openDatabaseConnection(String file) {
 		Connection c = null;
@@ -203,14 +210,22 @@ public class TownyWarsDatabase {
 		return this.executeSQL(sql);
 	}
 
+	public boolean saveWar(War war, boolean start) {
+		return savewar(war, start);
+	}
+
 	public boolean saveWar(War war) {
+		return savewar(war, false);
+	}
+
+	public boolean savewar(War war, boolean start) {
 		String orgString = "";
 		String deathString = "";
 		String offerString = "";
 		String acceptedString = "";
 		String moneyString = "";
 		for (Attackable org : war.getOrgs()) {
-			orgString = "," + ((TownyWarsOrg)org).getUUID().toString();
+			orgString = "," + ((TownyWarsOrg) org).getUUID().toString();
 			deathString += "," + Integer.toString(war.getDeaths(org));
 			offerString += ",'" + war.getPeaceOffer(org) + "'";
 			acceptedString += ",'" + Boolean.toString(war.acceptedPeace(org)) + "'";
@@ -222,10 +237,20 @@ public class TownyWarsDatabase {
 
 		String sql = townyWarsWarInsert + " VALUES ('" + war.getUUID().toString() + "','" + war.getName() + "'," + Long.toString(war.getStartTime()) + ","
 		        + Long.toString(war.getEndTime()) + "," + Long.toString(war.getPrewarTime()) + "," + war.getWarType() + "," + war.getWarStatus() + ",'"
-		        + ((TownyWarsOrg)war.getDeclarer()).getUUID().toString() + "','" + ((TownyWarsOrg)war.getTarget()).getUUID().toString() + "','" + ((TownyWarsOrg)war.getWinner()).getUUID().toString() + "',"
-		        + Double.toString(War.getThreshold()) + "," + orgString + "," + deathString + "," + offerString + "," + acceptedString + "," + moneyString
-		        + ");";
-		return this.executeSQL(sql);
+		        + ((TownyWarsOrg) war.getDeclarer()).getUUID().toString() + "','" + ((TownyWarsOrg) war.getTarget()).getUUID().toString() + "','"
+		        + ((TownyWarsOrg) war.getWinner()).getUUID().toString() + "'," + Double.toString(War.getThreshold()) + "," + orgString + "," + deathString
+		        + "," + offerString + "," + acceptedString + "," + moneyString + ");";
+		boolean result = this.executeSQL(sql);
+		if (start) {
+			sql = townyWarsWarStartInsert + " VALUES ('" + war.getUUID().toString() + "','" + war.getName() + "'," + Long.toString(war.getStartTime()) + ","
+			        + Long.toString(war.getEndTime()) + "," + Long.toString(war.getPrewarTime()) + "," + war.getWarType() + "," + war.getWarStatus() + ",'"
+			        + ((TownyWarsOrg) war.getDeclarer()).getUUID().toString() + "','" + ((TownyWarsOrg) war.getTarget()).getUUID().toString() + "','"
+			        + ((TownyWarsOrg) war.getWinner()).getUUID().toString() + "'," + Double.toString(War.getThreshold()) + "," + orgString + "," + deathString
+			        + "," + offerString + "," + acceptedString + "," + moneyString + ");";
+			result = result && this.executeSQL(sql);
+		}
+		return result;
+
 	}
 
 	public boolean saveAllTowns() {

@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import net.minecraftcenter.townywars.TownyWars;
 import net.minecraftcenter.townywars.interfaces.Attackable;
 
 import org.bukkit.Bukkit;
@@ -128,6 +129,9 @@ public class War extends TownyWarsObject {
 		TownyUniverse.getDataSource().saveAll();
 
 		informPlayers(true);
+		
+		// save the initial state of the war
+		TownyWars.database.saveWar(this,true);
 		return true;
 	}
 
@@ -514,6 +518,9 @@ public class War extends TownyWarsObject {
 
 		// save the stuff we've been doing
 		TownyUniverse.getDataSource().saveAll();
+		
+		// save the final state of the war
+		TownyWars.database.saveWar(this);
 	}
 
 }

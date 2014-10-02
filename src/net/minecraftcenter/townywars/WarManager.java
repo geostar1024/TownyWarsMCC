@@ -30,6 +30,7 @@ public class WarManager {
 		for (final War war : WarManager.activeWars) {
 			if ((war.getName().compareTo(warName) == 0) && (war.getWarStatus() != WarStatus.ENDED)) {
 				war.end();
+				activeWars.remove(war);
 				return true;
 			}
 		}
