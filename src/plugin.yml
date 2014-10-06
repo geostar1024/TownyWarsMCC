@@ -1,6 +1,6 @@
 name: TownyWars
 version: 1.2.0
-authors: [DanielRHarris, geostar1024]
+authors: [geostar1024, DanielRHarris]
 main: net.minecraftcenter.townywars.TownyWars
 depend: [Towny]
 commands:

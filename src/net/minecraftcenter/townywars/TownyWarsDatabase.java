@@ -3,6 +3,7 @@ package net.minecraftcenter.townywars;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 import java.text.SimpleDateFormat;
@@ -23,7 +24,8 @@ import com.palmergames.bukkit.towny.object.TownyUniverse;
 
 public class TownyWarsDatabase {
 
-	public Connection	connection	= null;
+	private static String	sep	     = "::";
+	public Connection	  connection	= null;
 
 	public TownyWarsDatabase(String file) {
 		try {
@@ -38,7 +40,7 @@ public class TownyWarsDatabase {
 	        "townywarswarsstart"	                     };
 
 	public static final String[]	tableCreation	     = {
-	        "CREATE TABLE " + tableNames[0] + "(uuid TEXT PRIMARY KEY NOT NULL," + " name TEXT NOT NULL," + " nation TEXT," + " hit LONG DEFAULT 0,"
+	        "CREATE TABLE " + tableNames[0] + "(uuid TEXT PRIMARY KEY NOT NULL," + " name TEXT NOT NULL," + " orgs TEXT," + " hit LONG DEFAULT 0,"
 	                + " attacker TEXT," + " login LONG DEFAULT 0," + " logout LONG DEFAULT 0," + " playtime LONG DEFAULT 0," + " wars TEXT)",
 
 	        "CREATE TABLE " + tableNames[1] + "(uuid TEXT PRIMARY KEY NOT NULL," + " name TEXT NOT NULL," + " active BOOLEAN NOT NULL,"
@@ -63,10 +65,10 @@ public class TownyWarsDatabase {
 
 	public static final String	 townyWarsTownInsert	 = "replace into townywarstowns (uuid,name,active,deaths,dp,maxdp,conquered,mindpfactor)";
 	public static final String	 townyWarsNationInsert	 = "replace into townywarsnations (uuid,name,active,deaths,wars,capitalpriority)";
-	public static final String	 townyWarsWarInsert	     = "replace into townywarswars (uuid,name,start,end,prewar,type,status,declarer,target,winner,threshold,orgs,offers,accepted,money)";
-	public static final String	 townyWarsResidentInsert	= "replace into townywarsresidents (uuid,name,nation,hit,attacker,login,logout,playtime,wars)";
+	public static final String	 townyWarsWarInsert	     = "replace into townywarswars (uuid,name,start,end,prewar,type,status,declarer,target,winner,threshold,orgs,deaths,offers,accepted,money)";
+	public static final String	 townyWarsResidentInsert	= "replace into townywarsresidents (uuid,name,orgs,hit,attacker,login,logout,playtime,wars)";
 	public static final String	 townyWarsDeathInsert	 = "replace into townywarsdeaths (time,date,puuid,pname,auuid,aname,cause,message)";
-	public static final String	 townyWarsWarStartInsert	= "replace into townywarswarsstart (uuid,name,start,end,prewar,type,status,declarer,target,winner,threshold,orgs,offers,accepted,money)";
+	public static final String	 townyWarsWarStartInsert	= "replace into townywarswarsstart (uuid,name,start,end,prewar,type,status,declarer,target,winner,threshold,orgs,deaths,offers,accepted,money)";
 
 	public static Connection openDatabaseConnection(String file) {
 		Connection c = null;
@@ -163,16 +165,19 @@ public class TownyWarsDatabase {
 		String warString = "";
 		String capitalString = "";
 		for (War war : nation.getWars()) {
-			warString += "," + war.getUUID().toString();
+			warString += sep + war.getUUID().toString();
 		}
 		if (warString.isEmpty()) {
-			warString = "' '";
+			warString = "''";
 		}
-		for (TownyWarsTown town : nation.getCapitalPriority()) {
-			capitalString += "," + town.getUUID();
+		Iterator<TownyWarsTown> itown = nation.getCapitalPriority().iterator();
+		while (itown.hasNext()) {
+			capitalString += itown.next().getUUID();
+			if (itown.hasNext())
+				capitalString += sep;
 		}
 		if (capitalString.isEmpty()) {
-			capitalString = "' '";
+			capitalString = "''";
 		}
 		String sql = townyWarsNationInsert + " VALUES ('" + nation.getUUID().toString() + "','" + nation.getName() + "','" + Boolean.toString(active) + "',"
 		        + Integer.toString(nation.getDeaths()) + "," + warString + "," + capitalString + ");";
@@ -181,24 +186,32 @@ public class TownyWarsDatabase {
 
 	public boolean saveResident(TownyWarsResident resident) {
 		String warString = "";
-		String lastNationUUID = "";
-		if (resident.getLastNation() != null) {
-			lastNationUUID = resident.getLastNation().getUUID().toString();
-		}
+		String orgString = "";
+		// String lastNationUUID = "";
+		// if (resident.getLastNation() != null) {
+		// lastNationUUID = resident.getLastNation().getUUID().toString();
+		// }
 		String lastAttackerUUID = "";
 		if (resident.getLastAttackerUUID() != null) {
 			lastAttackerUUID = resident.getLastAttackerUUID().toString();
 		}
-		for (War war : resident.getActiveWars()) {
-			warString += "," + war.getUUID().toString();
-		}
-		if (warString.isEmpty()) {
-			warString = "''";
+		Iterator<War> iwar = resident.getActiveWars().iterator();
+		while (iwar.hasNext()) {
+			warString += iwar.next().getUUID().toString();
+			if (iwar.hasNext())
+				warString += sep;
 		}
 
-		String sql = townyWarsResidentInsert + " VALUES ('" + resident.getUUID().toString() + "','" + resident.getPlayer().getName() + "','" + lastNationUUID
-		        + "'," + Long.toString(resident.getLastHitTime()) + ",'" + lastAttackerUUID + "'," + Long.toString(resident.getLastLoginTime()) + ","
-		        + Long.toString(resident.getLastLogoutTime()) + "," + Long.toString(resident.getTotalPlayTime()) + "," + warString + ");";
+		Iterator<Attackable> iorg = resident.getOrgs().iterator();
+		while (iorg.hasNext()) {
+			orgString += iorg.next().getUUID().toString();
+			if (iorg.hasNext())
+				orgString += sep;
+		}
+
+		String sql = townyWarsResidentInsert + " VALUES ('" + resident.getUUID().toString() + "','" + resident.getPlayer().getName() + "','" + orgString + "',"
+		        + Long.toString(resident.getLastHitTime()) + ",'" + lastAttackerUUID + "'," + Long.toString(resident.getLastLoginTime()) + ","
+		        + Long.toString(resident.getLastLogoutTime()) + "," + Long.toString(resident.getTotalPlayTime()) + ",'" + warString + "');";
 		System.out.print(sql);
 		return this.executeSQL(sql);
 	}
@@ -224,30 +237,45 @@ public class TownyWarsDatabase {
 		String offerString = "";
 		String acceptedString = "";
 		String moneyString = "";
-		for (Attackable org : war.getOrgs()) {
-			orgString = "," + ((TownyWarsOrg) org).getUUID().toString();
-			deathString += "," + Integer.toString(war.getDeaths(org));
-			offerString += ",'" + war.getPeaceOffer(org) + "'";
-			acceptedString += ",'" + Boolean.toString(war.acceptedPeace(org)) + "'";
-			moneyString += "," + Double.toString(war.getRequestedMoney(org));
+		String winner = "";
+		String target ="";
+		if (war.getWinner() != null) {
+			winner = war.getWinner().getUUID().toString();
 		}
-		if (offerString.isEmpty()) {
-			offerString = "''";
+		if (war.getTarget() != null) {
+			target = war.getTarget().getUUID().toString();
+		}
+		Iterator<Attackable> iorg = war.getOrgs().iterator();
+		while (iorg.hasNext()) {
+			Attackable org = iorg.next();
+			if (org==null) continue;
+			orgString += org.getUUID().toString();
+			deathString += Integer.toString(war.getDeaths(org));
+			if (war.getPeaceOffer(org) != null) {
+				offerString += war.getPeaceOffer(org);
+			}
+			else {
+				offerString += " ";
+			}
+			acceptedString += Boolean.toString(war.acceptedPeace(org));
+			moneyString += Double.toString(war.getRequestedMoney(org));
+			if (iorg.hasNext()) {
+				orgString += sep;
+				deathString += sep;
+				offerString += sep;
+				acceptedString += sep;
+				moneyString += sep;
+			}
 		}
 
-		String sql = townyWarsWarInsert + " VALUES ('" + war.getUUID().toString() + "','" + war.getName() + "'," + Long.toString(war.getStartTime()) + ","
-		        + Long.toString(war.getEndTime()) + "," + Long.toString(war.getPrewarTime()) + "," + war.getWarType() + "," + war.getWarStatus() + ",'"
-		        + ((TownyWarsOrg) war.getDeclarer()).getUUID().toString() + "','" + ((TownyWarsOrg) war.getTarget()).getUUID().toString() + "','"
-		        + ((TownyWarsOrg) war.getWinner()).getUUID().toString() + "'," + Double.toString(War.getThreshold()) + "," + orgString + "," + deathString
-		        + "," + offerString + "," + acceptedString + "," + moneyString + ");";
-		boolean result = this.executeSQL(sql);
+		String sql = " VALUES ('" + war.getUUID().toString() + "','" + war.getName() + "'," + Long.toString(war.getStartTime()) + ","
+		        + Long.toString(war.getEndTime()) + "," + Long.toString(war.getPrewarTime()) + ",'" + war.getWarType() + "','" + war.getWarStatus() + "','"
+		        + war.getDeclarer().getUUID().toString() + "','" + target + "','" + winner + "',"
+		        + Double.toString(War.getThreshold()) + ",'" + orgString + "','" + deathString + "','" + offerString + "','" + acceptedString + "','"
+		        + moneyString + "');";
+		boolean result = this.executeSQL(townyWarsWarInsert + sql);
 		if (start) {
-			sql = townyWarsWarStartInsert + " VALUES ('" + war.getUUID().toString() + "','" + war.getName() + "'," + Long.toString(war.getStartTime()) + ","
-			        + Long.toString(war.getEndTime()) + "," + Long.toString(war.getPrewarTime()) + "," + war.getWarType() + "," + war.getWarStatus() + ",'"
-			        + ((TownyWarsOrg) war.getDeclarer()).getUUID().toString() + "','" + ((TownyWarsOrg) war.getTarget()).getUUID().toString() + "','"
-			        + ((TownyWarsOrg) war.getWinner()).getUUID().toString() + "'," + Double.toString(War.getThreshold()) + "," + orgString + "," + deathString
-			        + "," + offerString + "," + acceptedString + "," + moneyString + ");";
-			result = result && this.executeSQL(sql);
+			result = result && this.executeSQL(townyWarsWarStartInsert + sql);
 		}
 		return result;
 
@@ -285,7 +313,7 @@ public class TownyWarsDatabase {
 
 	public boolean saveAllWars() {
 		boolean noerror = true;
-		for (War war : WarManager.getWars()) {
+		for (War war : War.getAllWars()) {
 			if (!this.saveWar(war)) {
 				noerror = false;
 			}
@@ -323,11 +351,11 @@ public class TownyWarsDatabase {
 				String deathsString = result.getString("deaths");
 				String offersString = result.getString("offers");
 				String acceptedString = result.getString("accepted");
-				// String moneyString=result.getString("money");
+				String moneyString = result.getString("money");
 
 				boolean error = false;
 				List<Attackable> allOrgs = new ArrayList<Attackable>();
-				for (String orgUUID : orgString.split(",")) {
+				for (String orgUUID : orgString.split(sep)) {
 					Attackable org = TownyWarsOrg.getOrg(UUID.fromString(orgUUID));
 					if (org == null) {
 						error = true;
@@ -338,7 +366,6 @@ public class TownyWarsDatabase {
 				if (error) {
 					return false;
 				}
-
 				War war = new War(name, declarer, uuid);
 				war.setWarType(type);
 				war.setWarStatus(status);
@@ -346,15 +373,21 @@ public class TownyWarsDatabase {
 				war.setPrewarTime(prewarTime);
 				war.setStartTime(startTime);
 
-				String allDeaths[] = deathsString.split(",");
-				String allOffers[] = offersString.split(",");
-				String allAccepted[] = acceptedString.split(",");
-				// String allMoney[]=moneyString.split(",");
-
+				String allDeaths[] = deathsString.split(sep);
+				String allOffers[] = offersString.split(sep);
+				String allAccepted[] = acceptedString.split(sep);
+				String allMoney[] = moneyString.split(sep);
+				
 				for (int k = 0; k < allOrgs.size(); k++) {
 					Attackable org = allOrgs.get(k);
 					war.setDeaths(org, Integer.parseInt(allDeaths[k]));
-					war.setPeaceOffer(org, allOffers[k]);
+					if (allOffers[k].equals(" ")) {
+						war.setPeaceOffer(org, null);
+					}
+					else {
+						war.setPeaceOffer(org, allOffers[k]);
+					}
+					war.setRequestedMoney(org, Double.parseDouble(allMoney[k]));
 					if (Boolean.parseBoolean(allAccepted[k])) {
 						war.acceptedPeace(org);
 					}
@@ -391,7 +424,8 @@ public class TownyWarsDatabase {
 				} catch (NotRegisteredException e) {
 
 					// need to mark this town as inactive
-					this.executeQuery("replace into townywarstowns (uuid,active) values (" + uuid + ",'false');");
+					String sql1 = "replace into townywarstowns (uuid,name,active) values ('" + uuid.toString() + "','" + name + "','false');";
+					this.executeQuery(sql1);
 				}
 				if (town == null) {
 					continue;
@@ -418,11 +452,7 @@ public class TownyWarsDatabase {
 			return false;
 		}
 		try {
-			String nationString = result.getString("nation");
-			UUID nationUUID = null;
-			if (!nationString.isEmpty()) {
-				nationUUID = UUID.fromString(nationString);
-			}
+			String orgString = result.getString("orgs");
 			long hitTime = result.getLong("hit");
 			String attackerString = result.getString("attacker");
 			UUID attackerUUID = null;
@@ -438,21 +468,36 @@ public class TownyWarsDatabase {
 				System.out.println("[TownyWars] error loading player from database!");
 			}
 
-			// doesn't matter if it comes back null
-			TownyWarsNation nation = TownyWarsNation.getNation(nationUUID);
-
 			resident.setLastAttackerUUID(attackerUUID);
 			resident.setLastHitTime(hitTime);
 			resident.setLastLoginTime(loginTime);
 			resident.setLastLogoutTime(logoutTime);
 			resident.setTotalPlayTime(playTime);
-			resident.setLastNation(nation);
 
-			// match the saved war names to active wars for this resident
-			for (String warName : warString.split(",")) {
-				War war = WarManager.getWar(warName);
-				if (war != null) {
-					resident.addActiveWar(war);
+			// match the saved war UUIDs to active wars for this resident
+			String warStrings[] = warString.split(sep);
+			if (warStrings.length > 0) {
+				for (String warName : warString.split(sep)) {
+					if (warName.isEmpty()) continue;
+					UUID warUUID = UUID.fromString(warName);
+					War war = War.getWar(warUUID);
+					if (war != null) {
+						resident.addActiveWar(war);
+					}
+				}
+			}
+
+			// match the saved org UUIDs to orgs for this resident
+			// note that addOrg updates the resident list of the org that is added!
+			String orgStrings[] = orgString.split(sep);
+			if (orgStrings.length > 0) {
+				for (String orgName : orgString.split(sep)) {
+					if (orgName.isEmpty()) continue;
+					UUID orgUUID = UUID.fromString(orgName);
+					Attackable org = TownyWarsOrg.getOrg(orgUUID);
+					if (org != null) {
+						resident.addOrg(org);
+					}
 				}
 			}
 
@@ -483,7 +528,7 @@ public class TownyWarsDatabase {
 				} catch (NotRegisteredException e) {
 
 					// need to mark this town as inactive
-					this.executeQuery("replace into townywarsnations (uuid,active) values (" + uuid + ",'false');");
+					this.executeQuery("replace into townywarsnations (uuid,name,active) values ('" + uuid.toString() + "','" + name + "','false');");
 				}
 				if (nation == null) {
 					continue;
@@ -497,7 +542,7 @@ public class TownyWarsDatabase {
 				TownyWarsNation.putNation(newNation);
 
 				int k = 0;
-				for (String capital : capitalString.split(",")) {
+				for (String capital : capitalString.split(sep)) {
 					Town town = null;
 					try {
 						town = TownyUniverse.getDataSource().getTown(capital);
@@ -526,6 +571,17 @@ public class TownyWarsDatabase {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+
+	public boolean saveOrg(Attackable org, boolean active) {
+		if (org instanceof TownyWarsTown) {
+			return saveTown((TownyWarsTown) org, active);
+		}
+		if (org instanceof TownyWarsNation) {
+			return saveNation((TownyWarsNation) org, active);
+		}
+		return false;
+		// TODO: add check for Coalitions here
 	}
 
 }

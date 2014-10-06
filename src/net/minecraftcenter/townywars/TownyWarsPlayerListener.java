@@ -26,6 +26,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import com.palmergames.bukkit.towny.exceptions.AlreadyRegisteredException;
 import com.palmergames.bukkit.towny.exceptions.NotRegisteredException;
 import com.palmergames.bukkit.towny.object.Nation;
+import com.palmergames.bukkit.towny.object.Resident;
 import com.palmergames.bukkit.towny.object.Town;
 import com.palmergames.bukkit.towny.object.TownyUniverse;
 
@@ -87,6 +88,14 @@ public class TownyWarsPlayerListener implements Listener {
 				// safely ignoreable since we've just created the new nation
 			}
 			TownyWarsNation.putNation(new TownyWarsNation(nation));
+			TownyWarsNation newNation=TownyWarsNation.getNation(nation);
+			for (Resident re : nation.getResidents()) {
+				TownyWarsResident resident1 = TownyWarsResident.getResident(re);
+				if (resident1 != null) {
+					resident1.addOrg(newNation);
+				}
+			}
+			newNation.save();
 			TownyUniverse.getDataSource().saveAll();
 		}
 	}
@@ -118,9 +127,7 @@ public class TownyWarsPlayerListener implements Listener {
 				return;
 			}
 
-			// String playerName=((Player)event.getEntity()).getName();
-			final UUID playerUUID = ((Player) event.getEntity()).getUniqueId();
-			final TownyWarsResident player = TownyWarsResident.getResident(playerUUID);
+			final TownyWarsResident player = TownyWarsResident.getResident(((Player) event.getEntity()).getUniqueId());
 			if (player != null) {
 				// update the player's stats
 				player.setLastHitTime(hitTime);
@@ -144,7 +151,7 @@ public class TownyWarsPlayerListener implements Listener {
 		final DamageCause damageCause = player.getLastDamageCause().getCause();
 
 		Player playerKiller = null;
-		final TownyWarsResident currentResident = TownyWarsResident.getResident(player.getUniqueId());
+		final TownyWarsResident resident = TownyWarsResident.getResident(player.getUniqueId());
 
 		System.out.println(player.getWorld().getName());
 
@@ -155,9 +162,9 @@ public class TownyWarsPlayerListener implements Listener {
 			// let's look up who hit them last, and how long ago
 			long lastHitTime = 0;
 
-			if (currentResident != null) {
-				lastHitTime = currentResident.getLastHitTime();
-				lastAttackerUUID = currentResident.getLastAttackerUUID();
+			if (resident != null) {
+				lastHitTime = resident.getLastHitTime();
+				lastAttackerUUID = resident.getLastAttackerUUID();
 			}
 
 			System.out.println(((deathTime - lastHitTime) / 1000) + " ago by " + lastAttackerUUID);
@@ -188,10 +195,10 @@ public class TownyWarsPlayerListener implements Listener {
 				event.setDeathMessage(event.getDeathMessage() + " while trying to escape " + playerKiller.getName());
 			}
 		}
-		if (currentResident != null) {
+		if (resident != null) {
 			// reset dead player's stats
-			currentResident.setLastAttackerUUID(null);
-			currentResident.setLastHitTime(0);
+			resident.setLastAttackerUUID(null);
+			resident.setLastHitTime(0);
 		}
 
 		// we need to record the kill in all its glory to a log file for moderation use
@@ -207,43 +214,62 @@ public class TownyWarsPlayerListener implements Listener {
 			return;
 		}
 
+		TownyWarsResident killer = TownyWarsResident.getResident(playerKiller.getUniqueId());
+
 		// if we've made it this far, it means that the death should affect TownyWars
 		// now we know who to credit, so let's adjust Towny to match
 
+		TownyWarsTown attackerTown = null;
+
 		try {
-			final TownyWarsTown attackerTown = TownyWarsTown.getTown(TownyWarsResident.getResident(playerKiller.getUniqueId()).getResident().getTown());
-			final TownyWarsNation attackerNation = TownyWarsNation.getNation(attackerTown.getTown().getNation());
-
-			final TownyWarsTown defenderTown = TownyWarsTown.getTown(TownyWarsResident.getResident(player.getUniqueId()).getResident().getTown());
-			final TownyWarsNation defenderNation = TownyWarsNation.getNation(defenderTown.getTown().getNation());
-
-			final War sharedWar = WarManager.getSharedWar(attackerNation, defenderNation);
-			if (sharedWar != null) {
-				defenderTown.addDeath();
-				defenderNation.addDeath();
-				final double currentDP = defenderTown.modifyDP(-1);
-
-				// only allow town conquest in a normal war; conquest is not desirable in a rebellion or flag war, only DP damage
-				if ((currentDP <= 0) && (sharedWar.getWarType() == WarType.NORMAL)) {
-					// town was conquered, so update things
-					WarManager.moveTown(defenderTown, attackerNation);
-				} else {
-					if (currentDP > 0) {
-						event.getEntity().sendMessage(ChatColor.RED + "Warning! Your town only has " + currentDP + " DP left!");
-					} else {
-						event.getEntity().sendMessage(ChatColor.RED + "Danger! Your town's DP is negative! (" + currentDP + ")");
-					}
-				}
-				if (sharedWar.checkWinner() != null) {
-					sharedWar.end();
-				}
-			}
+			attackerTown = TownyWarsTown.getTown(TownyWarsResident.getResident(playerKiller.getUniqueId()).getResident().getTown());
+			TownyWarsTown.getTown(TownyWarsResident.getResident(player.getUniqueId()).getResident().getTown());
+		} catch (NotRegisteredException e) {
+			// either the attacker or the defender is not in a town, and thus can't be in a war, so we're done here
+			return;
 		}
 
-		// if an exception is thrown, one or more of the towns/nations could be resolved
-		// this is no problem because it means the players involved in the kill aren't in a war (since only nations can be at war)
-		catch (final NotRegisteredException e) {
-			return;
+		// we want any wars that both players share
+		// there could be multiple, as the various levels of orgs that the players belong to could be in separate wars
+		double dploss = -1;
+		if (attackerTown.getDP() < 0) {
+			dploss *= Math.pow(2, 4 * (attackerTown.getDP() / (attackerTown.getMaxDP() * attackerTown.getMinDPFactor())));
+		}
+		for (War war : resident.getActiveWars()) {
+			for (War war1 : killer.getActiveWars()) {
+				if (war.equals(war1)) {
+					for (Attackable org : war.getOrgs()) {
+						if (resident.inOrg(org)) {
+							war.addDeath(org);
+							org.setDP(dploss);
+							if (org.getDP() < 0 && org instanceof TownyWarsTown && !(war.getEnemy(org) instanceof TownyWarsTown)
+							        && war.getWarType().equals(WarType.NORMAL)) {
+								// town was conquered
+								WarManager.moveTown((TownyWarsTown) org, (TownyWarsNation) war.getEnemy(org));
+							}
+							int currentDP = (int) org.getDP();
+							int currentMaxDP = (int) org.getMaxDP();
+							for (TownyWarsResident re : org.getResidents()) {
+								Player plr = re.getPlayer();
+								if (plr == null) {
+									// player is offline!
+									continue;
+								}
+								if (currentDP < 0) {
+									plr.sendMessage(ChatColor.RED + "Danger! Your town's DP is negative! (" + currentDP + "/" + currentMaxDP + ")");
+								} else {
+									plr.sendMessage(ChatColor.RED + "Warning! Your town only has " + currentDP + "out of " + currentMaxDP + " DP left!");
+								}
+								// see if someone has won as a result of this
+								if (war.checkWinner() != null) {
+									war.end();
+								}
+								break;
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -264,40 +290,43 @@ public class TownyWarsPlayerListener implements Listener {
 			} else {
 				System.out.println("new player added!");
 			}
+		} else {
+			TownyWarsResident.updateOrgs(newResident);
 		}
 		newResident.setLastLoginTime(loginTime);
-		TownyWarsNation nation = null;
-		try {
-			nation = TownyWarsNation.getNation(newResident.getResident().getTown().getNation());
-		} catch (final NotRegisteredException e) {
 
-			// the player is not registered for some reason or is not in a town or nation
-			// clearly they don't need to be sent any messages
+		// see if resident is in any orgs, return if not
+		if (!newResident.inAnyOrg()) {
 			return;
 		}
-		// it's possible the player may not be in a nation, so skip all this if
-		// so; otherwise. . .
-		if (nation != null) {
 
-			// check that the player's stored lastNation is the same as the nation they're currently in and update if it's not
-			if (nation != newResident.getLastNation()) {
-				newResident.setLastNation(nation);
-			}
-
-			// inform the player about the wars currently going on
-			if (!nation.getWars().isEmpty()) {
-				for (final War war : nation.getWars()) {
-					war.informPlayers(newResident);
-					if (nation.getNation().hasAssistant(newResident.getResident()) || newResident.getResident().isKing()) {
-						final Attackable enemy = war.getEnemy(nation);
+		for (Attackable org : newResident.getOrgs()) {
+			for (War war : org.getWars()) {
+				if (!newResident.isInActiveWar(war)) {
+					newResident.addActiveWar(war);
+				}
+				war.informPlayers(newResident);
+				final Attackable enemy = war.getEnemy(org);
+				if (org instanceof TownyWarsTown) {
+					if (((TownyWarsTown) org).getTown().hasAssistant(newResident.getResident()) || newResident.getResident().isMayor()) {
 						if (war.getPeaceOffer(enemy) != null) {
 							player.sendMessage(ChatColor.GREEN + enemy.getName() + " has offered you peace:");
 							player.sendMessage(war.getPeaceOffer(enemy));
 						}
 					}
 				}
+				if (org instanceof TownyWarsNation) {
+					if (((TownyWarsNation) org).getNation().hasAssistant(newResident.getResident()) || newResident.getResident().isKing()) {
+						if (war.getPeaceOffer(enemy) != null) {
+							player.sendMessage(ChatColor.GREEN + enemy.getName() + " has offered you peace:");
+							player.sendMessage(war.getPeaceOffer(enemy));
+						}
+					}
+				}
+
 			}
 		}
+
 	}
 
 	// update player playtime stats and save the object when they quit
@@ -308,7 +337,8 @@ public class TownyWarsPlayerListener implements Listener {
 		final TownyWarsResident resident = TownyWarsResident.getResident(player.getUniqueId());
 		resident.setLastLogoutTime(logoutTime);
 		resident.updateTotalPlayTime();
-		TownyWars.database.saveResident(resident);
+		resident.save();
+		resident.clearOrgs();
 	}
 
 }

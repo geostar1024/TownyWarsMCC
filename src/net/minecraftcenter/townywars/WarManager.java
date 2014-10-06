@@ -1,17 +1,14 @@
 package net.minecraftcenter.townywars;
 
-import java.util.HashSet;
-import java.util.Set;
-
+import net.minecraftcenter.townywars.interfaces.Attackable;
 import net.minecraftcenter.townywars.object.TownyWarsNation;
+import net.minecraftcenter.townywars.object.TownyWarsResident;
 import net.minecraftcenter.townywars.object.TownyWarsTown;
 import net.minecraftcenter.townywars.object.War;
 import net.minecraftcenter.townywars.object.War.WarStatus;
 import net.minecraftcenter.townywars.object.War.WarType;
 
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.entity.Player;
 
 import com.palmergames.bukkit.towny.exceptions.NotRegisteredException;
 import com.palmergames.bukkit.towny.object.Resident;
@@ -19,7 +16,7 @@ import com.palmergames.bukkit.towny.object.TownyUniverse;
 
 public class WarManager {
 
-	private static Set<War>	activeWars	= new HashSet<War>();
+	//private static Set<War>	activeWars	= new HashSet<War>();
 
 	// try to end the war of the given name
 	// returns true if successful
@@ -27,10 +24,9 @@ public class WarManager {
 		if (warName == null) {
 			return false;
 		}
-		for (final War war : WarManager.activeWars) {
+		for (final War war : War.getAllWars()) {
 			if ((war.getName().compareTo(warName) == 0) && (war.getWarStatus() != WarStatus.ENDED)) {
 				war.end();
-				activeWars.remove(war);
 				return true;
 			}
 		}
@@ -38,26 +34,13 @@ public class WarManager {
 	}
 
 	// find out if two nations are in a war together
-	public static War getSharedWar(final TownyWarsNation nation1, final TownyWarsNation nation2) {
-		for (final War war : nation1.getWars()) {
-			if (war.hasMember(nation2)) {
+	public static War getSharedWar(final Attackable declarer, final Attackable target) {
+		for (final War war : declarer.getWars()) {
+			if (war.hasMember(target)) {
 				return war;
 			}
 		}
 		return null;
-	}
-
-	public static War getWar(final String warName) {
-		for (final War war : WarManager.activeWars) {
-			if (war.getName().compareTo(warName) == 0) {
-				return war;
-			}
-		}
-		return null;
-	}
-
-	public static Set<War> getWars() {
-		return WarManager.activeWars;
 	}
 
 	// handles the nitty gritty of conquest
@@ -92,28 +75,24 @@ public class WarManager {
 		town.addConquered();
 	}
 
-	public static boolean quickFlagWar(final TownyWarsNation declarer, final TownyWarsTown target, final TownyWarsNation targetParent) {
+	public static boolean quickRaid(final Attackable declarer, final Attackable target) {
 
-		if (WarManager.getSharedWar(declarer, targetParent) != null) {
+		if (WarManager.getSharedWar(declarer, target) != null) {
 			return false;
 		}
 
-		// make a default name using the declarer's name plus the last 6 digits of the current millisecond time
+		// make a default name using the declarer's name plus the last 4 digits of the current millisecond time
 		// ugly? yes, but it's their fault for doing things "ze kveek way" . . . .
 		final String random = Long.toString(System.currentTimeMillis());
-		final String name = declarer.getNation().getName() + "-" + random.substring(random.length() - 4, random.length());
+		final String name = declarer.getName() + "-" + random.substring(random.length() - 4, random.length());
 
 		final War war = new War(name, declarer);
-		WarManager.activeWars.add(war);
-
-		war.setTarget(targetParent);
-
+		war.setTarget(target);
 		war.setWarType(WarType.RAID);
-
 		return war.execute();
 	}
 
-	public static boolean quickRebellion(final String name, final TownyWarsTown rebelTown, final TownyWarsNation parent) {
+	public static boolean quickRebellion(final String name, final Attackable rebelTown, final Attackable parent) {
 
 		// first make sure the parent nation isn't itself in a rebellion
 		// it is *not* rebellions all the way down . . .
@@ -124,7 +103,7 @@ public class WarManager {
 		}
 
 		// also check that there is more than one town in the parent nation
-		if (parent.getNation().getTowns().size() < 2) {
+		if (((TownyWarsNation) parent).getNation().getTowns().size() < 2) {
 			return false;
 		}
 
@@ -133,7 +112,7 @@ public class WarManager {
 		final String random = Long.toString(System.currentTimeMillis());
 		final String warName = rebelTown.getName() + "-" + random.substring(random.length() - 4, random.length());
 
-		TownyWarsNation rebelNation = null;
+		Attackable rebelNation = null;
 
 		// try to make a new nation . . .
 		try {
@@ -147,8 +126,8 @@ public class WarManager {
 
 		// . . .and move the town
 		try {
-			parent.getNation().removeTown(rebelTown.getTown());
-			rebelNation.getNation().addTown(rebelTown.getTown());
+			((TownyWarsNation) parent).getNation().removeTown(((TownyWarsTown) rebelTown).getTown());
+			((TownyWarsNation) rebelNation).getNation().addTown(((TownyWarsTown) rebelTown).getTown());
 		} catch (final Exception e) {
 			System.out.println("[TownyWars] quick rebellion town movement failed catastrophically!");
 			e.printStackTrace();
@@ -167,7 +146,7 @@ public class WarManager {
 		return war.execute();
 	}
 
-	public static boolean quickWar(final TownyWarsNation declarer, final TownyWarsNation target) {
+	public static boolean quickWar(final Attackable declarer, final Attackable target) {
 
 		if (WarManager.getSharedWar(declarer, target) != null) {
 			return false;
@@ -176,7 +155,7 @@ public class WarManager {
 		// make a default name using the declarer's name plus the last 6 digits of the current millisecond time
 		// ugly? yes, but it's their fault for doing things "ze kveek way" . . . .
 		final String random = Long.toString(System.currentTimeMillis());
-		final String name = declarer.getNation().getName() + "-" + random.substring(random.length() - 4, random.length());
+		final String name = declarer.getName() + "-" + random.substring(random.length() - 4, random.length());
 
 		final War war = new War(name, declarer);
 
@@ -192,22 +171,32 @@ public class WarManager {
 
 	// sets a generic peace request for the given nation in the given war
 	// if everyone wants peace, the war gets ended
-	public static void requestPeace(final War war, final TownyWarsNation nation) {
-		war.setPeaceOffer(nation, "peace");
+	public static void requestPeace(final War war, final Attackable org) {
+		war.setPeaceOffer(org, "peace");
 
-		// TODO: unsafe!
-		final TownyWarsNation enemy = (TownyWarsNation) war.getEnemy(nation);
-
-		for (final Resident re : enemy.getNation().getResidents()) {
-			if ((re.isKing()) || (enemy.getNation().hasAssistant(re))) {
-				final Player plr = Bukkit.getPlayer(re.getName());
-				if (plr != null) {
-					plr.sendMessage(ChatColor.GREEN + nation.getName() + " has requested peace!");
+		final Attackable enemy = war.getEnemy(org);
+		
+		if (enemy instanceof TownyWarsTown) {
+			for (final Resident re : ((TownyWarsTown) enemy).getTown().getResidents()) {
+				TownyWarsResident resident=TownyWarsResident.getResident(re);
+				// players could be offline, so getResident would return null
+				if (resident!=null) {
+					resident.getPlayer().sendMessage(ChatColor.GREEN + org.getName() + " has requested peace in war "+war.getName()+"!");
 				}
 			}
 		}
+		
+		if (enemy instanceof TownyWarsNation) {
+			for (final Resident resident : ((TownyWarsNation) enemy).getNation().getResidents()) {
+				TownyWarsResident.getResident(resident).getPlayer().sendMessage(ChatColor.GREEN + org.getName() + " has requested peace in war "+war.getName()+"!");
+			}
+		}
+		
+		// TODO: add check for Coalitions here
+		
 		if (war.allPeaceOffered()) {
 			war.end();
 		}
+		war.save();
 	}
 }

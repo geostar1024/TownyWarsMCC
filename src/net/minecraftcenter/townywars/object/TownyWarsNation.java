@@ -2,11 +2,11 @@ package net.minecraftcenter.townywars.object;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
-
-import net.minecraftcenter.townywars.TownyWars;
 
 import com.palmergames.bukkit.towny.object.Nation;
 import com.palmergames.bukkit.towny.object.Town;
@@ -15,8 +15,12 @@ public class TownyWarsNation extends TownyWarsOrg {
 
 	private static Map<Nation, TownyWarsNation>	nationToTownyWarsNationHash	= new HashMap<Nation, TownyWarsNation>();
 
-	public static TownyWarsNation[] getAllNations() {
-		return (TownyWarsNation[]) nationToTownyWarsNationHash.values().toArray();
+	public static Set<TownyWarsNation> getAllNations() {
+		Set<TownyWarsNation> allNations=new HashSet<TownyWarsNation>();
+		for (Nation nation : TownyWarsNation.nationToTownyWarsNationHash.keySet()) {
+			allNations.add(TownyWarsNation.nationToTownyWarsNationHash.get(nation));
+		}
+		return allNations;
 	}
 
 	public static TownyWarsNation getNation(final Nation nation) {
@@ -106,7 +110,7 @@ public class TownyWarsNation extends TownyWarsOrg {
 	public boolean remove() {
 		TownyWarsNation.nationToTownyWarsNationHash.remove(this);
 		TownyWarsOrg.removeTownyWarsObject(this);
-		return TownyWars.database.saveNation(this, false);
+		return this.save(false);
 	}
 
 	public void removeCapitalPriorityForTown(final TownyWarsTown town) {
@@ -122,7 +126,7 @@ public class TownyWarsNation extends TownyWarsOrg {
 	private void townyWarsNation(final Nation nation) {
 		this.nation = nation;
 		setName(getNation().getName());
-		TownyWars.database.saveNation(this, true);
+		this.save();
 	}
 
 }

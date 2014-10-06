@@ -1,19 +1,24 @@
 package net.minecraftcenter.townywars.object;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
-import net.minecraftcenter.townywars.TownyWars;
-
+import com.palmergames.bukkit.towny.object.Resident;
 import com.palmergames.bukkit.towny.object.Town;
 
 public class TownyWarsTown extends TownyWarsOrg {
 
 	private static Map<Town, TownyWarsTown>	townToTownyWarsTownHash	= new HashMap<Town, TownyWarsTown>();
 
-	public static TownyWarsTown[] getAllTowns() {
-		return (TownyWarsTown[]) TownyWarsTown.townToTownyWarsTownHash.values().toArray();
+	public static Set<TownyWarsTown> getAllTowns() {
+		Set<TownyWarsTown> allTowns=new HashSet<TownyWarsTown>();
+		for (Town nation : TownyWarsTown.townToTownyWarsTownHash.keySet()) {
+			allTowns.add(TownyWarsTown.townToTownyWarsTownHash.get(nation));
+		}
+		return allTowns;
 	}
 
 	// this is substantially slower than the other getTown methods since it has to loop over all existing towns
@@ -94,7 +99,7 @@ public class TownyWarsTown extends TownyWarsOrg {
 	public boolean remove() {
 		TownyWarsTown.townToTownyWarsTownHash.remove(this);
 		TownyWarsOrg.removeTownyWarsObject(this);
-		return TownyWars.database.saveTown(this, false);
+		return this.save(false);
 	}
 
 	public double resetDP() {
@@ -121,7 +126,13 @@ public class TownyWarsTown extends TownyWarsOrg {
 			setDP(dp);
 		}
 		setMinDPFactor(mindpfactor);
-		TownyWars.database.saveTown(this, true);
+		for (Resident re : town.getResidents()) {
+			TownyWarsResident resident=TownyWarsResident.getResident(re);
+			if (resident!=null) {
+				this.addResident(resident);
+			}
+		}
+		this.save();
 	}
 
 }

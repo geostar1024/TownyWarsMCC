@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import net.minecraftcenter.townywars.TownyWars;
 import net.minecraftcenter.townywars.interfaces.Attackable;
 
 import com.palmergames.bukkit.towny.object.TownyEconomyObject;
@@ -74,6 +75,9 @@ public class TownyWarsOrg extends TownyWarsObject implements Attackable {
 	private double	                      maxdp	            = 0;
 
 	private final Set<War>	              wars	            = new HashSet<War>();
+	private final Set<War>	              storedwars	    = new HashSet<War>();
+
+	private final Set<TownyWarsResident>	residents	    = new HashSet<TownyWarsResident>();
 
 	private final Map<TownyWarsOrg, Long>	previousEnemies	= new HashMap<TownyWarsOrg, Long>();
 
@@ -162,6 +166,82 @@ public class TownyWarsOrg extends TownyWarsObject implements Attackable {
 
 	public void setMaxDP(final double maxdp) {
 		this.maxdp = maxdp;
+	}
+
+	public Set<War> getStoredWars() {
+		return this.storedwars;
+	}
+
+	public void addStoredWar(War war) {
+		this.storedwars.add(war);
+	}
+
+	public void removeStoredWar(War war) {
+		this.storedwars.remove(war);
+	}
+
+	public War getWar(String warName) {
+		for (War war : this.getWars()) {
+			if (war.getName().equals(warName)) {
+				return war;
+			}
+		}
+		return null;
+	}
+
+	public War getStoredWar(String warName) {
+		for (War war : this.getStoredWars()) {
+			if (war.getName().equals(warName)) {
+				return war;
+			}
+		}
+		return null;
+	}
+
+	public boolean hasWar(War war) {
+		for (War war1 : this.getWars()) {
+			if (war1.equals(war)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public boolean hasStoredWar(War war) {
+		for (War war1 : this.getStoredWars()) {
+			if (war1.equals(war)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public boolean hasResident(TownyWarsResident resident) {
+		return this.residents.contains(resident);
+	}
+
+	public Set<TownyWarsResident> getResidents() {
+		return this.residents;
+	}
+
+	public void addResident(TownyWarsResident resident) {
+		this.residents.add(resident);
+	}
+
+	public void removeResident(TownyWarsResident resident) {
+		this.residents.remove(resident);
+	}
+
+	public void clearStoredWars() {
+		this.storedwars.clear();
+	}
+
+	public boolean save(boolean active) {
+		return TownyWars.database.saveOrg(this, active);
+	}
+
+	public boolean save() {
+		return TownyWars.database.saveOrg(this, true);
 	}
 
 }
