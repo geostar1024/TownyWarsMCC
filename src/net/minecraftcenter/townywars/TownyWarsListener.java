@@ -164,6 +164,9 @@ public class TownyWarsListener implements Listener {
 		} catch (final NotRegisteredException ex) {
 			// do nothing; evidently the town the resident left was not in a nation
 		}
+		final double oldMaxDP = town.getMaxDP();
+		final double newMaxDP = town.calculateMaxDP();
+		town.modifyDP(newMaxDP - oldMaxDP);
 		resident.save();
 		town.save();
 	}
